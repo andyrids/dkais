@@ -1,0 +1,77 @@
+[project]
+name = "aisdma"
+dynamic = ["version"]
+description = "Download & process Danish Maritime Authority AIS dataset."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICEN[CS]E*", "COPYRIGHT"]
+authors = [{ name = "Andrew Ridyard", email = "andyrids.culprit320@passmail.com" }]
+maintainers = [{ name = "Andrew Ridyard", email = "andyrids.culprit320@passmail.com" }]
+requires-python = ">=3.11"
+keywords = []
+classifiers = [
+    # 3 - Alpha | 4 - Beta | 5 - Production/Stable
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+]
+dependencies = ["rich"]
+
+[dependency-groups]
+dev = [
+    "pkgdx",
+    "coverage",
+    "pytest",
+    "pymarkdownlnt",
+]
+
+[project.urls]
+Changelog = "https://github.com/andyrids/aisdma/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/andyrids/aisdma/blob/main/README.md"
+Issues = "https://github.com/andyrids/aisdma/issues"
+Repository = "https://github.com/andyrids/aisdma"
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.coverage.run]
+omit = ["tests/*", "*/src_test*/*"]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+# lets SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PKGDX work under hatch-vcs
+dist_name = "aisdma"
+local_scheme = "no-local-version"
+version_scheme = "guess-next-dev"
+
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/README.md", "/CHANGELOG.md"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aisdma"]
+
+[tool.pytest.ini_options]
+addopts = ["--import-mode=importlib"]
+log_cli = true
+log_cli_level = "INFO"
+tmp_path_retention_policy = "failed"
+
+[tool.uv]
+cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true, tags = true } }]
+
+[[tool.uv.index]]
+name = "gitlab"
+url = "https://gitlab.com/api/v4/projects/82928123/packages/pypi/simple"
+explicit = true
+
+[tool.uv.sources]
+pkgdx = { index = "gitlab" }

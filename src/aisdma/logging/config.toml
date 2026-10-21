@@ -1,0 +1,48 @@
+version = 1
+incremental = false
+disable_existing_loggers = false
+
+[formatters.stdlib-standard-format]
+format = "%(levelname)s: %(message)s"
+datefmt = "%Y-%m-%dT%H:%M:%S%z"
+
+[formatters.rich-standard-format]
+format = "%(message)s"
+datefmt = "[%Y-%m-%dT%H:%M:%S%z]"
+
+[formatters.rich-verbose-format]
+format = "[%(funcName)s] %(message)s"
+datefmt = "[%Y-%m-%dT%H:%M:%S%z]"
+
+[formatters.rich-extra-verbose-format]
+format = "[%(levelname)s|%(module)s|L%(lineno)d] %(asctime)s: %(message)s"
+datefmt = "%Y-%m-%dT%H:%M:%S%z"
+
+[filters]
+# Unused, but kept to match expected `dictConfig` structure
+
+[handlers.rich-standard-handler]
+class = "rich.logging.RichHandler"
+formatter = "rich-standard-format"
+show_path = false
+rich_tracebacks = true
+markup = true
+omit_repeated_times = true
+
+[handlers.rich-verbose-handler]
+class = "rich.logging.RichHandler"
+formatter = "rich-verbose-format"
+show_path = true
+rich_tracebacks = true
+markup = false
+omit_repeated_times = false
+
+[handlers.stdlib-standard-handler]
+class = "logging.StreamHandler"
+formatter = "stdlib-standard-format"
+stream = "ext://sys.stderr"
+
+[loggers.aisdma]
+level = "WARNING"
+handlers = ["rich-verbose-handler"]
+propagate = true
