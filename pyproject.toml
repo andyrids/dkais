@@ -1,14 +1,14 @@
 [project]
 name = "aisdma"
 dynamic = ["version"]
-description = "Download & process Danish Maritime Authority AIS dataset."
+description = "Management tool for Danish Maritime Authority historical AIS data."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICEN[CS]E*", "COPYRIGHT"]
 authors = [{ name = "Andrew Ridyard", email = "andyrids.culprit320@passmail.com" }]
 maintainers = [{ name = "Andrew Ridyard", email = "andyrids.culprit320@passmail.com" }]
 requires-python = ">=3.11"
-keywords = []
+keywords = ["AIS", "MMSI", "IMO", "maritime", "DMA", "trajectory", "ship"]
 classifiers = [
     # 3 - Alpha | 4 - Beta | 5 - Production/Stable
     "Development Status :: 4 - Beta",
@@ -21,7 +21,13 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
     "Typing :: Typed",
 ]
-dependencies = ["rich"]
+dependencies = [
+    "boto3>=1.43.117",
+    "polars>=2.0.0",
+    "psutil>=7.2.2",
+    "rich",
+    "zlib-ng>=1.0.0 ; python_full_version < '3.14' or sys_platform != 'win32'",
+]
 
 [dependency-groups]
 dev = [
@@ -29,7 +35,12 @@ dev = [
     "coverage",
     "pytest",
     "pymarkdownlnt",
+    "boto3-stubs[s3]>=1.43.116",
+    "types-psutil>=7.2.2.20260906",
 ]
+
+[project.scripts]
+aisdma = "aisdma.__main__:main"
 
 [project.urls]
 Changelog = "https://github.com/andyrids/aisdma/blob/main/CHANGELOG.md"

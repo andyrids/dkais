@@ -16,10 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > - `Fixed` for any bug fixes.
 > - `Security` in case of vulnerabilities.
 
-## [unreleased]
+## [Unreleased]
 
 ### Added
 
 - [pkgdx](https://gitlab.com/andyrids/pkgdx) canonical standards management.
 - CI/CD pipeline for linting, testing & release.
 - Standards & guidelines documentation in `docs/`
+- `aisdma list` command to catalogue bucket archives & local state (`--json`).
+- `aisdma download` command for concurrent boto3 downloads with Rich progress.
+- `aisdma process` command converting all CSV dialects to `YEAR=/MONTH=` Parquet.
+- `aisdma process` extracts one day ahead, in memory when RAM allows, with zlib-ng.
+- `scripts/` profiling & benchmark tools for `aisdma process`.
