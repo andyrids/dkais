@@ -1,4 +1,4 @@
-"""Core CLI plumbing shared by the `aisdma` commands."""
+"""Core CLI plumbing shared by the `dkais` commands."""
 
 import argparse
 import dataclasses
@@ -10,11 +10,11 @@ from pathlib import Path
 
 from rich.console import Console
 
-from aisdma import exceptions
+from dkais import exceptions
 
 logger = logging.getLogger(__package__)
 
-DATA_DIR_ENV = "AISDMA_DATA_DIR"
+DATA_DIR_ENV = "DKAIS_DATA_DIR"
 
 
 class ExitCode(IntEnum):
@@ -82,7 +82,7 @@ def resolve_data_dir(path: Path | None) -> Path:
 
     Raises:
         exceptions.DataDirNotSetError: If neither the flag nor
-            `AISDMA_DATA_DIR` is set.
+            `DKAIS_DATA_DIR` is set.
     """
     if path is not None:
         return path.resolve()

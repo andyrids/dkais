@@ -11,8 +11,8 @@ from unittest import mock
 import pytest
 from rich.console import Console
 
-from aisdma._core import CLIContext
-from aisdma.logging import GLOBAL_CONSOLE, configure_cli_logging
+from dkais._core import CLIContext
+from dkais.logging import GLOBAL_CONSOLE, configure_cli_logging
 
 HEADER_22 = (
     "# Timestamp,Type of mobile,MMSI,Latitude,Longitude,Navigational status,"
@@ -86,7 +86,7 @@ def configured_logging() -> Iterator[None]:
     try:
         yield
     finally:
-        logger = logging.getLogger("aisdma")
+        logger = logging.getLogger("dkais")
         for handler in logger.handlers[:]:
             logger.removeHandler(handler)
 
@@ -124,8 +124,8 @@ def make_cli_context() -> Callable[..., CLIContext]:
 
 @pytest.fixture
 def data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Provide an empty data directory, isolated from `AISDMA_DATA_DIR`."""
-    monkeypatch.delenv("AISDMA_DATA_DIR", raising=False)
+    """Provide an empty data directory, isolated from `DKAIS_DATA_DIR`."""
+    monkeypatch.delenv("DKAIS_DATA_DIR", raising=False)
     root = tmp_path / "data"
     root.mkdir()
     return root

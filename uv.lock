@@ -7,46 +7,6 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "aisdma"
-source = { editable = "." }
-dependencies = [
-    { name = "boto3" },
-    { name = "polars" },
-    { name = "psutil" },
-    { name = "rich" },
-    { name = "zlib-ng", marker = "python_full_version < '3.14' or sys_platform != 'win32'" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "boto3-stubs", extra = ["s3"] },
-    { name = "coverage" },
-    { name = "pkgdx" },
-    { name = "pymarkdownlnt" },
-    { name = "pytest" },
-    { name = "types-psutil" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "boto3", specifier = ">=1.43.117" },
-    { name = "polars", specifier = ">=2.0.0" },
-    { name = "psutil", specifier = ">=7.2.2" },
-    { name = "rich" },
-    { name = "zlib-ng", marker = "python_full_version < '3.14' or sys_platform != 'win32'", specifier = ">=1.0.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "boto3-stubs", extras = ["s3"], specifier = ">=1.43.116" },
-    { name = "coverage" },
-    { name = "pkgdx", index = "https://gitlab.com/api/v4/projects/82928123/packages/pypi/simple" },
-    { name = "pymarkdownlnt" },
-    { name = "pytest" },
-    { name = "types-psutil", specifier = ">=7.2.2.20260906" },
-]
-
-[[package]]
 name = "application-file-scanner"
 version = "0.6.4"
 source = { registry = "https://pypi.org/simple" }
@@ -497,6 +457,46 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/69/67/382a863fff94eae5a0cf05542179169a1c49a4c8784a9480621e2066ca7d/detect_secrets-1.5.0.tar.gz", hash = "sha256:6bb46dcc553c10df51475641bb30fd69d25645cc12339e46c824c1e0c388898a", size = 97351, upload-time = "2024-05-06T17:46:19.721Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4e/5e/4f5fe4b89fde1dc3ed0eb51bd4ce4c0bca406246673d370ea2ad0c58d747/detect_secrets-1.5.0-py3-none-any.whl", hash = "sha256:e24e7b9b5a35048c313e983f76c4bd09dad89f045ff059e354f9943bf45aa060", size = 120341, upload-time = "2024-05-06T17:46:16.628Z" },
+]
+
+[[package]]
+name = "dkais"
+source = { editable = "." }
+dependencies = [
+    { name = "boto3" },
+    { name = "polars" },
+    { name = "psutil" },
+    { name = "rich" },
+    { name = "zlib-ng", marker = "python_full_version < '3.14' or sys_platform != 'win32'" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "boto3-stubs", extra = ["s3"] },
+    { name = "coverage" },
+    { name = "pkgdx" },
+    { name = "pymarkdownlnt" },
+    { name = "pytest" },
+    { name = "types-psutil" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "boto3", specifier = ">=1.43.117" },
+    { name = "polars", specifier = ">=2.0.0" },
+    { name = "psutil", specifier = ">=7.2.2" },
+    { name = "rich" },
+    { name = "zlib-ng", marker = "python_full_version < '3.14' or sys_platform != 'win32'", specifier = ">=1.0.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "boto3-stubs", extras = ["s3"], specifier = ">=1.43.116" },
+    { name = "coverage" },
+    { name = "pkgdx", index = "https://gitlab.com/api/v4/projects/82928123/packages/pypi/simple" },
+    { name = "pymarkdownlnt" },
+    { name = "pytest" },
+    { name = "types-psutil", specifier = ">=7.2.2.20260906" },
 ]
 
 [[package]]

@@ -25,7 +25,7 @@ Pytest is used for unit testing, with tests colocated in `tests/`.
 
 ## Conventions
 
-- Test modules: `tests/test_<module>.py`, mirroring `src/aisdma/<module>.py`
+- Test modules: `tests/test_<module>.py`, mirroring `src/dkais/<module>.py`
 - Shared fixtures live once in `tests/conftest.py` and are consumed via dependency injection
   rather than re-declared per test module
 - Progress and log TTY tests patch `GLOBAL_CONSOLE.is_terminal`, not `sys.stdout.isatty`. Logs and

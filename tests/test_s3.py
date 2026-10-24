@@ -1,4 +1,4 @@
-"""Unit tests for the bucket catalogue (`aisdma._s3`)."""
+"""Unit tests for the bucket catalogue (`dkais._s3`)."""
 
 from datetime import date
 from pathlib import Path
@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from botocore.stub import Stubber
 
-from aisdma import _s3
+from dkais import _s3
 
 
 @pytest.mark.parametrize(

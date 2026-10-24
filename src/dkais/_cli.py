@@ -1,6 +1,6 @@
 """CLI commands to list, download & process DMA AIS archives.
 
-NOTE: The `__main__` `argparse.ArgumentParser` aisdma CLI entry point uses this
+NOTE: The `__main__` `argparse.ArgumentParser` dkais CLI entry point uses this
 module to register subcommands (`add_subparsers`).
 """
 
@@ -37,13 +37,13 @@ from rich.progress import (
 )
 from rich.table import Table
 
-from aisdma import _download, _process, _s3, exceptions
-from aisdma._core import CLIContext, CLIGFormatter, ExitCode, resolve_data_dir
-from aisdma.logging import GLOBAL_CONSOLE
+from dkais import _download, _process, _s3, exceptions
+from dkais._core import CLIContext, CLIGFormatter, ExitCode, resolve_data_dir
+from dkais.logging import GLOBAL_CONSOLE
 
 if TYPE_CHECKING:
-    from aisdma._process import Member
-    from aisdma._s3 import Archive
+    from dkais._process import Member
+    from dkais._s3 import Archive
 
 logger = logging.getLogger(__package__)
 
@@ -237,7 +237,7 @@ def command_download(ctx: CLIContext) -> int:
         logger.warning("No archives in the selected range")
         return ExitCode.EX_OK
 
-    GLOBAL_CONSOLE.rule("[cyan]aisdma download")
+    GLOBAL_CONSOLE.rule("[cyan]dkais download")
     try:
         with _setup_progress(
             TextColumn("[progress.description]{task.description}"),
@@ -348,7 +348,7 @@ def command_process(ctx: CLIContext) -> int:
         _process.INFLATE.__name__,
         decimal(available),
     )
-    GLOBAL_CONSOLE.rule("[cyan]aisdma process")
+    GLOBAL_CONSOLE.rule("[cyan]dkais process")
     failed = 0
     pool = ThreadPoolExecutor(max_workers=1)
     try:
@@ -419,7 +419,7 @@ def add_subparsers(
         "--data-dir",
         type=Path,
         metavar="PATH",
-        help="Data directory root (default: $AISDMA_DATA_DIR)",
+        help="Data directory root (default: $DKAIS_DATA_DIR)",
     )
     common.add_argument(
         "--start",

@@ -16,8 +16,8 @@ from boto3.s3.transfer import TransferConfig
 from botocore.exceptions import BotoCoreError, ClientError
 from rich.progress import Progress
 
-from aisdma import exceptions
-from aisdma._s3 import BUCKET, TRANSFER_CONCURRENCY, Archive
+from dkais import exceptions
+from dkais._s3 import BUCKET, TRANSFER_CONCURRENCY, Archive
 
 if TYPE_CHECKING:
     from mypy_boto3_s3 import S3Client

@@ -1,4 +1,4 @@
-"""Logging configuration for `aisdma`.
+"""Logging configuration for `dkais`.
 
 The Rich global `Console` (`GLOBAL_CONSOLE`) is configured to use STDERR
 (`reconfigure(stderr=True)`) for logging and progress display. A separate
@@ -43,6 +43,6 @@ def configure_cli_logging(level: int = logging.WARNING) -> None:
     CONFIG_STR = CONFIG_PATH.read_text(encoding="utf-8")
     logging.config.dictConfig(tomllib.loads(CONFIG_STR))
 
-    logger = logging.getLogger("aisdma")
+    logger = logging.getLogger("dkais")
     logger.setLevel(level)
     logger.propagate = False

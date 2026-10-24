@@ -1,4 +1,4 @@
-"""Unit tests for the `aisdma` CLI (`aisdma.__main__`, `aisdma._cli`)."""
+"""Unit tests for the `dkais` CLI (`dkais.__main__`, `dkais._cli`)."""
 
 import argparse
 import json
@@ -9,20 +9,20 @@ from unittest import mock
 
 import pytest
 
-from aisdma import __main__, _cli, _s3, exceptions
-from aisdma._core import ExitCode, resolve_data_dir
+from dkais import __main__, _cli, _s3, exceptions
+from dkais._core import ExitCode, resolve_data_dir
 
-CLI = "aisdma._cli"
+CLI = "dkais._cli"
 
 Samples = dict[str, tuple[str, str]]
 ZipWriter = Callable[[Path, dict[str, str]], Path]
 
 
 def _run_main(argv: list[str]) -> int:
-    """Run `aisdma.__main__.main` with `argv` & return the exit code."""
+    """Run `dkais.__main__.main` with `argv` & return the exit code."""
     with (
-        mock.patch("sys.argv", ["aisdma", *argv]),
-        mock.patch("aisdma.__main__.configure_cli_logging"),
+        mock.patch("sys.argv", ["dkais", *argv]),
+        mock.patch("dkais.__main__.configure_cli_logging"),
         pytest.raises(SystemExit) as exc_info,
     ):
         __main__.main()
@@ -56,12 +56,12 @@ def test_parse_dates_rejects_invalid(value: str) -> None:
 def test_resolve_data_dir_env_fallback(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The flag wins, then `AISDMA_DATA_DIR`, else an error."""
-    monkeypatch.setenv("AISDMA_DATA_DIR", str(tmp_path / "env"))
+    """The flag wins, then `DKAIS_DATA_DIR`, else an error."""
+    monkeypatch.setenv("DKAIS_DATA_DIR", str(tmp_path / "env"))
     assert resolve_data_dir(tmp_path / "flag") == tmp_path / "flag"
     assert resolve_data_dir(None) == tmp_path / "env"
 
-    monkeypatch.delenv("AISDMA_DATA_DIR")
+    monkeypatch.delenv("DKAIS_DATA_DIR")
     with pytest.raises(exceptions.DataDirNotSetError):
         resolve_data_dir(None)
 
@@ -69,7 +69,7 @@ def test_resolve_data_dir_env_fallback(
 def test_main_without_command_shows_help(
     capsys: pytest.CaptureFixture,
 ) -> None:
-    """`aisdma` prints a header & help, exiting 0."""
+    """`dkais` prints a header & help, exiting 0."""
     assert _run_main([]) == ExitCode.EX_OK
     assert "COMMANDS" in capsys.readouterr().out
 
@@ -88,7 +88,7 @@ def test_main_requires_selection(data_dir: Path, argv: list[str]) -> None:
 
 
 def test_main_maps_missing_data_dir_to_usage(data_dir: Path) -> None:
-    """No `--data-dir` & no `AISDMA_DATA_DIR` is a usage error."""
+    """No `--data-dir` & no `DKAIS_DATA_DIR` is a usage error."""
     assert _run_main(["process", "--all"]) == ExitCode.EX_USAGE
 
 

@@ -1,5 +1,5 @@
-"""Type definitions for aisdma.
+"""Type definitions for dkais.
 
 This module defines type aliases and `TypedDict` classes for structured data
-used within the `aisdma` package.
+used within the `dkais` package.
 """

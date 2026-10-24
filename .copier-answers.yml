@@ -2,11 +2,11 @@
 _commit: v0.1.0
 _src_path: gh:andyrids/copier-python-package
 git_platform: GitHub
-git_repository: https://github.com/andyrids/aisdma
+git_repository: https://github.com/andyrids/dkais
 github_user: andyrids
 install_just_dependency: false
 package_description: Download & process Danish Maritime Authority AIS dataset.
-package_name: aisdma
+package_name: dkais
 publish_to_pypi: true
 python_min: '3.11'
 python_version: 3.13.13

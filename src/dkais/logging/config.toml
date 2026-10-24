@@ -42,7 +42,7 @@ class = "logging.StreamHandler"
 formatter = "stdlib-standard-format"
 stream = "ext://sys.stderr"
 
-[loggers.aisdma]
+[loggers.dkais]
 level = "WARNING"
 handlers = ["rich-verbose-handler"]
 propagate = true

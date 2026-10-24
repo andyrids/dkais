@@ -1,4 +1,4 @@
-"""Benchmark `aisdma process` variants on real archives.
+"""Benchmark `dkais process` variants on real archives.
 
 Reads zips from `<data-dir>/raw` (read-only) and writes CSVs, Parquet and
 results only under `--out`, so the real `<data-dir>/parquet` is untouched.
@@ -51,7 +51,7 @@ import psutil
 from rich.console import Console
 from rich.table import Table
 
-from aisdma import _process, _s3
+from dkais import _process, _s3
 
 console = Console()
 

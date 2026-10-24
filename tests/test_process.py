@@ -1,4 +1,4 @@
-"""Unit tests for CSV to Parquet conversion (`aisdma._process`)."""
+"""Unit tests for CSV to Parquet conversion (`dkais._process`)."""
 
 import sys
 import types
@@ -12,7 +12,7 @@ from unittest import mock
 import polars as pl
 import pytest
 
-from aisdma import _process, exceptions
+from dkais import _process, exceptions
 
 Samples = dict[str, tuple[str, str]]
 ZipWriter = Callable[[Path, dict[str, str]], Path]

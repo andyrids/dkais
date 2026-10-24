@@ -1,4 +1,4 @@
-"""__init__ for aisdma logging module."""
+"""__init__ for dkais logging module."""
 
 import logging
 
@@ -14,4 +14,4 @@ __all__: list[str] = [
     "configure_cli_logging",
 ]
 
-logging.getLogger("aisdma").addHandler(logging.NullHandler())
+logging.getLogger("dkais").addHandler(logging.NullHandler())
