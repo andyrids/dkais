@@ -33,8 +33,8 @@ TRANSFER_CONFIG = TransferConfig(
     use_threads=True,
 )
 
-# Interval for the main thread to wake while waiting, so Ctrl-C is handled
 _POLL_SECONDS = 0.5
+"""Interval for the main thread to wake while waiting, so Ctrl-C is handled."""
 
 
 def is_downloaded(archive: Archive, raw_dir: Path) -> bool:
