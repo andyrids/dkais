@@ -1,8 +1,8 @@
-"""Smoke tests for the `aisdma` package."""
+"""Smoke tests for the `dkais` package."""
 
-import aisdma
+import dkais
 
 
 def test_version() -> None:
     """Assert the installed package exposes a version string."""
-    assert isinstance(aisdma.__version__, str)
+    assert isinstance(dkais.__version__, str)

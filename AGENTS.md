@@ -5,7 +5,7 @@ immutable: false
 recommended-context-tokens: 900
 ---
 
-# aisdma [`aisdma`]
+# dkais [`dkais`]
 
 Download & process Danish Maritime Authority AIS dataset.
 

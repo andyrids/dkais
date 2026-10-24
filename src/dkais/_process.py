@@ -30,7 +30,7 @@ from typing import BinaryIO
 
 import polars as pl
 
-from aisdma import exceptions
+from dkais import exceptions
 
 logger = logging.getLogger(__package__)
 

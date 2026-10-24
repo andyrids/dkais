@@ -1,4 +1,4 @@
-"""Unit tests for archive downloads (`aisdma._download`)."""
+"""Unit tests for archive downloads (`dkais._download`)."""
 
 import threading
 from pathlib import Path
@@ -8,8 +8,8 @@ from unittest import mock
 import pytest
 from rich.progress import Progress
 
-from aisdma import _download, _s3, exceptions
-from aisdma._s3 import Archive
+from dkais import _download, _s3, exceptions
+from dkais._s3 import Archive
 
 
 def _archive(key: str, size: int) -> Archive:

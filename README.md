@@ -16,13 +16,13 @@ Identification System (AIS) data provided by the Danish Maritime Authority (DMA)
 
 ## Usage
 
-`aisdma` mirrors the public bucket to a data directory and converts each daily CSV to Parquet.
-Set the directory once with `AISDMA_DATA_DIR` (or pass `--data-dir` to any command).
+`dkais` mirrors the public bucket to a data directory and converts each daily CSV to Parquet.
+Set the directory once with `DKAIS_DATA_DIR` (or pass `--data-dir` to any command).
 
 ```sh
-aisdma list --start 2026-10                       # archives & local state
-aisdma download --start 2026-10 --end 2026-10-07  # zips to <data-dir>/raw
-aisdma process --start 2026-10 --end 2026-10-07   # to <data-dir>/parquet
+dkais list --start 2026-10                       # archives & local state
+dkais download --start 2026-10 --end 2026-10-07  # zips to <data-dir>/raw
+dkais process --start 2026-10 --end 2026-10-07   # to <data-dir>/parquet
 ```
 
 `list --json` emits machine-readable output, `download -j N` sets concurrent downloads (default 4)

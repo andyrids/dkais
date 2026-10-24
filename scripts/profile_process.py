@@ -1,4 +1,4 @@
-"""Profile `aisdma process` stages on real archives.
+"""Profile `dkais process` stages on real archives.
 
 Reads zips from `<data-dir>/raw` (read-only) and writes Parquet, CSVs and
 reports only under `--out`, so the real `<data-dir>/parquet` is untouched.
@@ -34,7 +34,7 @@ import psutil
 from rich.console import Console
 from rich.table import Table
 
-from aisdma import _process, _s3
+from dkais import _process, _s3
 
 console = Console()
 

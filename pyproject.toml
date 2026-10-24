@@ -1,5 +1,5 @@
 [project]
-name = "aisdma"
+name = "dkais"
 dynamic = ["version"]
 description = "CLI for accessing historical AIS data maintained by the Danish Maritime Authority."
 readme = "README.md"
@@ -40,13 +40,13 @@ dev = [
 ]
 
 [project.scripts]
-aisdma = "aisdma.__main__:main"
+dkais = "dkais.__main__:main"
 
 [project.urls]
-Changelog = "https://github.com/andyrids/aisdma/blob/main/CHANGELOG.md"
-Documentation = "https://github.com/andyrids/aisdma/blob/main/README.md"
-Issues = "https://github.com/andyrids/aisdma/issues"
-Repository = "https://github.com/andyrids/aisdma"
+Changelog = "https://github.com/andyrids/dkais/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/andyrids/dkais/blob/main/README.md"
+Issues = "https://github.com/andyrids/dkais/issues"
+Repository = "https://github.com/andyrids/dkais"
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
@@ -60,7 +60,7 @@ source = "vcs"
 
 [tool.hatch.version.raw-options]
 # lets SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PKGDX work under hatch-vcs
-dist_name = "aisdma"
+dist_name = "dkais"
 local_scheme = "no-local-version"
 version_scheme = "guess-next-dev"
 
@@ -68,7 +68,7 @@ version_scheme = "guess-next-dev"
 include = ["/src", "/README.md", "/CHANGELOG.md"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/aisdma"]
+packages = ["src/dkais"]
 
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]

@@ -19,7 +19,7 @@ logger = logging.getLogger(__package__)
 
 ## Configuration
 
-Logging configuration lives in `src/aisdma/logging/_logging.py` as a single `dictConfig` dictionary
+Logging configuration lives in `src/dkais/logging/_logging.py` as a single `dictConfig` dictionary
 (`CONFIG`), separated into two distinct contexts to prevent interference with consuming
 applications:
 
@@ -28,14 +28,14 @@ applications:
 By default, the package is configured with a `NullHandler`. This prevents the library from
 polluting output when imported as a dependency.
 
-- Setup: `configure_pkg_logging()` is called in `src/aisdma/__init__.py`.
+- Setup: `configure_pkg_logging()` is called in `src/dkais/__init__.py`.
 
 ### (2) CLI logging (application)
 
 When executed as a CLI, logging is configured from `CONFIG` - a single `logging.StreamHandler`
-on STDERR, attached to the `aisdma` logger with `propagate = false`.
+on STDERR, attached to the `dkais` logger with `propagate = false`.
 
-- Setup: `configure_cli_logging(level)` is called in `src/aisdma/__main__.py`
+- Setup: `configure_cli_logging(level)` is called in `src/dkais/__main__.py`
 (if applicable) after argument parsing. The level is `DEBUG` with `-d` or `--debug`, otherwise `WARNING`.
 
 ## (3) CLI output

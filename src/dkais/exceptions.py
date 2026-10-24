@@ -1,8 +1,8 @@
-"""Custom exceptions for `aisdma`."""
+"""Custom exceptions for `dkais`."""
 
 
 class Error(Exception):
-    """Base-class for all exceptions raised by `aisdma`."""
+    """Base-class for all exceptions raised by `dkais`."""
 
 
 class DataDirNotSetError(Error):

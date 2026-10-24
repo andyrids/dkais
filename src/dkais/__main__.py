@@ -1,4 +1,4 @@
-"""Main entry point for the aisdma CLI."""
+"""Main entry point for the dkais CLI."""
 
 import argparse
 import logging
@@ -6,9 +6,9 @@ import sys
 import textwrap
 from typing import NoReturn
 
-from aisdma import __version__, _core, exceptions
-from aisdma._cli import add_subparsers
-from aisdma.logging import CLI_CONSOLE, configure_cli_logging
+from dkais import __version__, _core, exceptions
+from dkais._cli import add_subparsers
+from dkais.logging import CLI_CONSOLE, configure_cli_logging
 
 logger = logging.getLogger(__package__)
 
@@ -33,7 +33,7 @@ class CLIArgumentParser(argparse.ArgumentParser):
 
 
 def main() -> NoReturn:
-    """Provide a unified `aisdma` CLI entrypoint - list, download, process."""
+    """Provide a unified `dkais` CLI entrypoint - list, download, process."""
 
     # Provides a base parser for shared arguments across subcommands
     base_parser = CLIArgumentParser(add_help=False)
@@ -45,17 +45,17 @@ def main() -> NoReturn:
     )
 
     description = (
-        "aisdma downloads Danish Maritime Authority historical AIS archives "
+        "dkais downloads Danish Maritime Authority historical AIS archives "
         "from http://aisdata.ais.dk/ and converts them to Parquet, "
         "partitioned by YEAR and MONTH."
     )
 
     epilog = (
         "EXAMPLES:\n"
-        " aisdma list --start 2026-10\n"
-        " aisdma download --start 2026-10 --data-dir D:/ais\n"
-        " aisdma process --start 2026-10 --data-dir D:/ais\n\n"
-        "For more information see https://github.com/andyrids/aisdma."
+        " dkais list --start 2026-10\n"
+        " dkais download --start 2026-10 --data-dir D:/ais\n"
+        " dkais process --start 2026-10 --data-dir D:/ais\n\n"
+        "For more information see https://github.com/andyrids/dkais."
     )
 
     # Main parser for the CLI
@@ -100,7 +100,7 @@ def main() -> NoReturn:
 
     args = parser.parse_args()
 
-    # Empty command (`aisdma`) shows header and help
+    # Empty command (`dkais`) shows header and help
     if args.command is None:
         sys.stdout.write(f"DMA AIS data manager [v{__version__}]\n\n")
 
