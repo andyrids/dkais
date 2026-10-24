@@ -3,10 +3,11 @@
 Two renderings share one interface, chosen per stream as the TTY check in
 `docs/toolchain-logging.md` requires:
 
-- cargo (a terminal): right-aligned bold verbs above one transient bar
-- plain (not a terminal): one ASCII line per event, no colour or animation
+- minimal (a terminal): a dim intro line, one transient progress line with
+  `warning:` / `error:` messages above it, then a one line summary
+- plain (not a terminal): one unstyled line per event, no colour or animation
 
-NOTE: Events & progress go to STDERR (`GLOBAL_CONSOLE`) and the closing
+NOTE: Messages & progress go to STDERR (`GLOBAL_CONSOLE`) and the closing
 summary to STDOUT (`CLI_CONSOLE`), each rendered for its own stream.
 """
 
@@ -17,27 +18,34 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Protocol
 
-from rich.console import Console, ConsoleOptions, RenderResult
-from rich.filesize import decimal, pick_unit_and_suffix
-from rich.measure import Measurement
-from rich.progress import Progress, ProgressColumn, Task, TextColumn
+from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    DownloadColumn,
+    MofNCompleteColumn,
+    Progress,
+    ProgressColumn,
+    SpinnerColumn,
+    Task,
+    TextColumn,
+    TransferSpeedColumn,
+)
 from rich.table import Column
 from rich.text import Text
 from rich.traceback import Traceback
 
 from dkais.logging import CLI_CONSOLE, GLOBAL_CONSOLE
 
-VERB_WIDTH = 12
-"""Width of the right-aligned verb column."""
-
-_BAR_WIDTH = (12, 62)
-"""Minimum & maximum width of the status bar, brackets included."""
-
-_SUFFIXES = ["B", "kB", "MB", "GB", "TB"]
-
 
 class Reporter(Protocol):
-    """Receives item progress from a running command."""
+    """Receives item progress from a running command.
+
+    NOTE: `name` identifies an item in every call, and `item_started` comes
+    before its `item_done` or `item_failed`.
+    """
+
+    def item_started(self, name: str) -> None:
+        """Report an item that has started."""
 
     def advance(self, n: int) -> None:
         """Count `n` units (bytes) of progress."""
@@ -77,58 +85,59 @@ def plural(n: int, noun: str) -> str:
     return f"{n} {noun}{'' if n == 1 else 's'}"
 
 
-def _size_pair(done: int, total: int) -> str:
-    """Format `done/total` in the unit of `total`, e.g. `2.1/3.3 GB`."""
-    unit, suffix = pick_unit_and_suffix(total, _SUFFIXES, 1000)
-    return f"{done / unit:.1f}/{total / unit:.1f} {suffix}"
-
-
 def _reason(error: BaseException) -> str:
     """Return the first line of an error message, or its type name."""
     lines = str(error).strip().splitlines()
     return lines[0] if lines else type(error).__name__
 
 
-def event(
-    console: Console, verb: str, style: str, message: str | Text
-) -> None:
-    """Print a cargo event line, led by a right-aligned bold verb.
+def _hanging(console: Console, head: Text, message: str) -> None:
+    """Print `head message`, wrapped with a hanging indent under the message.
 
-    NOTE: Wraps the message by hand, so continuation lines hang under it
-    without trailing padding. The lines print in one call, so events from
-    download worker threads never interleave.
+    NOTE: Wraps by hand, so wrapped lines carry no trailing padding. The
+    lines print in one call, so messages from download worker threads never
+    interleave.
 
     Args:
         console: The console to print to.
-        verb: The verb, at most `VERB_WIDTH` characters.
-        style: The colour of the verb.
-        message: The event text; a `Text` keeps its own wrapping.
+        head: The prefix or mark leading the first line.
+        message: The text after it.
     """
-    text = Text(message) if isinstance(message, str) else message
-    room = max(console.width - VERB_WIDTH - 1, 20)
+    room = max(console.width - head.cell_len - 1, 20)
     rows = []
-    for i, line in enumerate(text.wrap(console, room)):
+    for i, line in enumerate(Text(message).wrap(console, room)):
         line.rstrip()
-        head = Text(verb.rjust(VERB_WIDTH), style=f"bold {style}")
-        rows.append(
-            Text.assemble(head if i == 0 else " " * VERB_WIDTH, " ", line)
-        )
+        indent = head if i == 0 else " " * head.cell_len
+        rows.append(Text.assemble(indent, " ", line))
     console.print(Text("\n").join(rows))
 
 
-def notice(console: Console, verb: str, style: str, message: str) -> None:
-    """Print an event, as a cargo line or a plain `VERB: message` line.
+def notice(console: Console, level: str, style: str, message: str) -> None:
+    """Print a `level: message` line, its prefix bold on a terminal.
 
     Args:
         console: The console to print to.
-        verb: The verb, e.g. `Warning`.
-        style: The colour of the verb on a terminal.
-        message: The event text.
+        level: The level, e.g. `warning`.
+        style: The colour of the prefix on a terminal.
+        message: The message.
     """
     if console.is_terminal:
-        event(console, verb, style, message)
+        _hanging(console, Text(f"{level}:", style=f"bold {style}"), message)
     else:
-        _plain(console, f"{verb.upper()}: {message}")
+        _plain(console, f"{level}: {message}")
+
+
+def info(console: Console, message: str) -> None:
+    """Print a line of context, dim on a terminal.
+
+    Args:
+        console: The console to print to.
+        message: The message.
+    """
+    if console.is_terminal:
+        console.print(message, style="dim", markup=False, highlight=False)
+    else:
+        _plain(console, message)
 
 
 def _plain(console: Console, line: str) -> None:
@@ -137,27 +146,27 @@ def _plain(console: Console, line: str) -> None:
 
 
 class EventHandler(logging.Handler):
-    """Render log records as events on the global console.
+    """Render log records as `warning:` / `error:` lines on STDERR.
 
     NOTE: Used below `--debug`, where expected failures are reported by the
     commands and only unexpected errors carry a traceback.
     """
 
     def emit(self, record: logging.LogRecord) -> None:
-        """Print the record as a `Warning` or `Error` event.
+        """Print the record as a `warning:` or `error:` line.
 
         Args:
             record: The log record.
         """
         try:
             console = GLOBAL_CONSOLE
+            message = record.getMessage()
             if record.levelno >= logging.ERROR:
-                verb, style = "Error", "red"
+                notice(console, "error", "red", message)
             elif record.levelno >= logging.WARNING:
-                verb, style = "Warning", "yellow"
+                notice(console, "warning", "yellow", message)
             else:
-                verb, style = "Info", "dim"
-            notice(console, verb, style, record.getMessage())
+                info(console, message)
             if record.exc_info and record.exc_info[1]:
                 if console.is_terminal:
                     _, error, tb = record.exc_info
@@ -171,125 +180,68 @@ class EventHandler(logging.Handler):
             self.handleError(record)
 
 
-class _Bar:
-    """A cargo-like `[=====>   ]` bar, sized to its column."""
-
-    def __init__(self, fraction: float) -> None:
-        """Create the bar.
-
-        Args:
-            fraction: The completed share, between 0 and 1.
-        """
-        self._fraction = min(max(fraction, 0.0), 1.0)
-
-    def __rich_measure__(
-        self, console: Console, options: ConsoleOptions
-    ) -> Measurement:
-        """Measure the bar between its minimum & maximum width."""
-        return Measurement(*_BAR_WIDTH)
-
-    def __rich_console__(
-        self, console: Console, options: ConsoleOptions
-    ) -> RenderResult:
-        """Render the bar to the allotted width."""
-        width = max(options.max_width - 2, 1)
-        filled = int(width * self._fraction)
-        if filled >= width:
-            inner = Text("=" * width, style="cyan")
-        else:
-            inner = Text.assemble(
-                ("=" * filled + ">", "cyan"), " " * (width - filled - 1)
-            )
-        yield Text.assemble("[", inner, "]")
-
-
-class _BarColumn(ProgressColumn):
-    """The status bar column."""
-
-    def render(self, task: Task) -> _Bar:
-        """Render the bar for a task."""
-        return _Bar(task.percentage / 100)
-
-
-class _TailColumn(ProgressColumn):
-    """Items done, then bytes & rate for transfers, then the ETA."""
-
-    def __init__(self, *, transfer: bool) -> None:
-        """Create the column.
-
-        Args:
-            transfer: Show bytes & rate, as for downloads.
-        """
-        # Reserve the widest typical tail, so the bar doesn't jitter
-        width = 44 if transfer else 16
-        super().__init__(table_column=Column(no_wrap=True, min_width=width))
-        self._transfer = transfer
+class _ETAColumn(ProgressColumn):
+    """The time remaining, once Rich has an estimate."""
 
     def render(self, task: Task) -> Text:
-        """Render e.g. `4/8  2.1/3.3 GB  480.0 MB/s  ETA 3.2s`."""
-        parts = [f"{task.fields['done']}/{task.fields['items']}"]
-        if self._transfer:
-            speed = task.speed
-            parts += [
-                _size_pair(int(task.completed), int(task.total or 0)),
-                f"{decimal(int(speed))}/s" if speed else "--/s",
-            ]
+        """Render e.g. `ETA 4s` or `ETA 1m04s`."""
         remaining = task.time_remaining
+        if remaining is None or task.finished:
+            return Text("")
         # Rich rounds the estimate up to whole seconds, so show those
-        eta = "--"
-        if remaining:
-            eta = (
-                f"{remaining:.0f}s" if remaining < 60 else duration(remaining)
-            )
-        parts.append(f"ETA {eta}")
-        return Text("  ".join(parts), style="dim")
+        eta = f"{remaining:.0f}s" if remaining < 60 else duration(remaining)
+        return Text(f"ETA {eta}", style="cyan")
 
 
 class LiveReporter:
-    """Cargo rendering: event lines above one transient status bar."""
+    """Minimal rendering: one transient progress line, failures above it."""
 
     def __init__(
-        self, progress: Progress, done_verb: str, *, counts_items: bool
+        self, progress: Progress, verb: str, *, counts_items: bool
     ) -> None:
         """Create the reporter.
 
         Args:
-            progress: The started status bar display, with one task.
-            done_verb: The verb for completed items, e.g. `Downloaded`.
+            progress: The started progress display, with one task.
+            verb: The command verb for failures, e.g. `download`.
             counts_items: Advance the bar per item, rather than per byte.
         """
         self._progress = progress
-        self._done_verb = done_verb
+        self._verb = verb
         self._lock = threading.Lock()
-        self._done = 0
+        self._active: list[str] = []
         self._task = progress.tasks[0].id
         self._step = 1 if counts_items else 0
+
+    def item_started(self, name: str) -> None:
+        """Show the item's name on the progress line."""
+        with self._lock:
+            self._active.append(name)
+            self._progress.update(self._task, active=" ".join(self._active))
 
     def advance(self, n: int) -> None:
         """Advance the bar by `n` units."""
         self._progress.advance(self._task, n)
 
-    def _count(self) -> None:
-        """Count one finished item, done or failed."""
+    def _finish(self, name: str) -> None:
+        """Take a finished item, done or failed, off the progress line."""
         with self._lock:
-            self._done += 1
+            self._active.remove(name)
             self._progress.update(
-                self._task, done=self._done, advance=self._step
+                self._task,
+                active=" ".join(self._active),
+                advance=self._step,
             )
 
     def item_done(self, name: str, detail: str) -> None:
-        """Print a `Downloaded name (detail)` line above the bar."""
-        self._count()
-        line = Text.assemble(
-            name, (f" ({detail})", "dim"), no_wrap=True, overflow="ellipsis"
-        )
-        event(self._progress.console, self._done_verb, "green", line)
+        """Count a completed item, which prints no line of its own."""
+        self._finish(name)
 
     def item_failed(self, name: str, error: BaseException) -> None:
-        """Print a `Failed name: reason` line above the bar."""
-        self._count()
-        message = f"{name}: {_reason(error)}"
-        event(self._progress.console, "Failed", "red", message)
+        """Print `error: failed to <verb> `name`: reason` above the bar."""
+        self._finish(name)
+        message = f"failed to {self._verb} `{name}`: {_reason(error)}"
+        notice(self._progress.console, "error", "red", message)
 
 
 class PlainReporter:
@@ -306,6 +258,9 @@ class PlainReporter:
         self._items = items
         self._lock = threading.Lock()
         self._done = 0
+
+    def item_started(self, name: str) -> None:
+        """Ignore starts; plain output prints an item once it finishes."""
 
     def advance(self, n: int) -> None:
         """Ignore byte progress; plain output has no live display."""
@@ -327,15 +282,14 @@ class PlainReporter:
 
 @contextmanager
 def reporter(
-    verb: str, done_verb: str, items: int, total: int | None = None
+    verb: str, items: int, total: int | None = None
 ) -> Generator[Reporter, None, None]:
-    """Report item progress for STDERR, cargo on a terminal, else plain.
+    """Report item progress for STDERR, minimal on a terminal, else plain.
 
     Args:
-        verb: The status bar verb, e.g. `Download`.
-        done_verb: The verb for completed items, e.g. `Downloaded`.
+        verb: The command verb for failures, e.g. `download`.
         items: The number of items expected.
-        total: The bytes expected for a transfer, else bar counts items.
+        total: The bytes expected for a transfer, else the bar counts items.
 
     Yields:
         The reporter for the running command.
@@ -344,26 +298,31 @@ def reporter(
     if not console.is_terminal:
         yield PlainReporter(console, items)
         return
+    counts: list[ProgressColumn] = (
+        [MofNCompleteColumn()]
+        if total is None
+        else [DownloadColumn(), TransferSpeedColumn()]
+    )
     progress = Progress(
+        SpinnerColumn("dots", style="cyan"),
+        BarColumn(bar_width=20, complete_style="cyan", finished_style="green"),
+        *counts,
+        _ETAColumn(),
         TextColumn(
-            "{task.description}",
-            style="bold cyan",
-            justify="right",
-            table_column=Column(width=VERB_WIDTH, no_wrap=True),
+            "{task.fields[active]}",
+            style="dim",
+            markup=False,
+            table_column=Column(no_wrap=True, overflow="ellipsis", ratio=1),
         ),
-        _BarColumn(),
-        _TailColumn(transfer=total is not None),
         console=console,
         transient=True,
+        expand=True,
     )
     with progress:
         progress.add_task(
-            verb,
-            total=items if total is None else total,
-            done=0,
-            items=items,
+            "", total=items if total is None else total, active=""
         )
-        yield LiveReporter(progress, done_verb, counts_items=total is None)
+        yield LiveReporter(progress, verb, counts_items=total is None)
 
 
 def _field(value: object) -> str:
@@ -373,6 +332,7 @@ def _field(value: object) -> str:
 
 
 def summarize(
+    verb: str,
     noun: str,
     done: int,
     attempted: int,
@@ -382,10 +342,11 @@ def summarize(
 ) -> None:
     """Print the failure count to STDERR & the run summary to STDOUT.
 
-    NOTE: On a terminal, STDOUT gets a cargo `Finished` line; otherwise a
-    single `key=value` line for scripts.
+    NOTE: On a terminal, STDOUT gets a `✓ Downloaded …` line, marked `!` when
+    anything failed; otherwise a single `key=value` line for scripts.
 
     Args:
+        verb: The past-tense verb, e.g. `Downloaded`.
         noun: The singular item noun, e.g. `archive`.
         done: The items completed.
         attempted: The items attempted.
@@ -397,20 +358,17 @@ def summarize(
     if failed:
         notice(
             GLOBAL_CONSOLE,
-            "Failed",
+            "error",
             "red",
-            f"{failed} of {plural(attempted, noun)}, re-run to retry",
+            f"{failed} of {plural(attempted, noun)} failed, re-run to retry",
         )
     if CLI_CONSOLE.is_terminal:
         count = plural(done, noun)
+        mark = Text("✓", style="green")
         if failed:
             count = f"{done} of {plural(attempted, noun)}"
-        event(
-            CLI_CONSOLE,
-            "Finished",
-            "yellow" if failed else "green",
-            f"{count}{detail} → {dest}",
-        )
+            mark = Text("!", style="yellow")
+        _hanging(CLI_CONSOLE, mark, f"{verb} {count}{detail} → {dest}")
     else:
         line = " ".join(f"{k}={_field(v)}" for k, v in fields.items())
         _plain(CLI_CONSOLE, line)

@@ -38,7 +38,7 @@ markup = false
 omit_repeated_times = false
 
 [handlers.event-handler]
-# Default below `--debug` - cargo-style events, plain off a terminal
+# Default below `--debug` - minimal `warning:`/`error:` lines, plain off a terminal
 class = "dkais._report.EventHandler"
 
 [handlers.stdlib-standard-handler]

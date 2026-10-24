@@ -27,7 +27,7 @@ from rich.table import Table
 
 from dkais import _download, _process, _s3, exceptions
 from dkais._core import CLIContext, CLIGFormatter, ExitCode, resolve_data_dir
-from dkais._report import duration, notice, plural, reporter, summarize
+from dkais._report import duration, info, plural, reporter, summarize
 from dkais.logging import GLOBAL_CONSOLE
 
 if TYPE_CHECKING:
@@ -149,14 +149,15 @@ def command_list(ctx: CLIContext) -> int:
     table.add_column("Size", justify="right", no_wrap=True)
     if data_dir:
         table.add_column("Raw", justify="center")
-        table.add_column("Days", justify="right")
+        table.add_column("Processed", justify="right", no_wrap=True)
 
-    for row in rows:
+    for archive, row in zip(archives, rows, strict=True):
         cells = [row["key"], row["start"], row["end"], decimal(row["size"])]
         if data_dir:
+            days = (archive.end - archive.start).days + 1
             cells += [
                 "[green]✓" if row["downloaded"] else "",
-                str(row["processed_days"]),
+                f"{row['processed_days']}/{days}",
             ]
         table.add_row(*cells)
 
@@ -203,27 +204,22 @@ def command_download(ctx: CLIContext) -> int:
 
     pending = _download.pending_archives(archives, raw_dir)
     present = len(archives) - len(pending)
-    notice(
+    total = sum(a.size for a in pending)
+    info(
         GLOBAL_CONSOLE,
-        "Resolving",
-        "cyan",
-        f"{plural(len(archives), 'archive')} in range ({present} already "
-        "present)",
+        f"{plural(len(pending), 'archive')} to download · {decimal(total)} · "
+        f"{present} already present",
     )
     began = time.monotonic()
     try:
-        with reporter(
-            "Download",
-            "Downloaded",
-            len(pending),
-            total=sum(a.size for a in pending),
-        ) as report:
+        with reporter("download", len(pending), total=total) as report:
             failed = _download.download_archives(
                 client, pending, raw_dir, report, args.jobs
             )
     except KeyboardInterrupt:
         logger.warning(
-            "Interrupted - partial downloads discarded, re-run to resume"
+            "Interrupted - unfinished downloads discarded, "
+            "re-run to download them again"
         )
         return ExitCode.EX_INTERRUPT
 
@@ -231,6 +227,7 @@ def command_download(ctx: CLIContext) -> int:
     size = sum(a.size for a in pending if a not in failed)
     done = len(pending) - len(failed)
     summarize(
+        "Downloaded",
         "archive",
         done,
         len(pending),
@@ -329,12 +326,11 @@ def command_process(ctx: CLIContext) -> int:
         return ExitCode.EX_OK
     skipped = len(in_range) - len(members)
 
-    notice(
+    csv_size = decimal(sum(member.size for member in members))
+    info(
         GLOBAL_CONSOLE,
-        "Resolving",
-        "cyan",
-        f"{plural(len(in_range), 'day')} in range "
-        f"({skipped} already processed)",
+        f"{plural(len(members), 'day')} to process · {csv_size} CSV · "
+        f"{skipped} already processed",
     )
     _process.clean_stale(parquet_dir, tmp_dir)
     available = psutil.virtual_memory().available
@@ -347,10 +343,11 @@ def command_process(ctx: CLIContext) -> int:
     began = time.monotonic()
     pool = ThreadPoolExecutor(max_workers=1)
     try:
-        with reporter("Process", "Processed", len(members)) as report:
+        with reporter("process", len(members)) as report:
             for member, extracted in _extract_ahead(
                 pool, members, tmp_dir, available
             ):
+                report.item_started(member.name)
                 started = time.monotonic()
                 try:
                     target = _process.convert(
@@ -371,10 +368,8 @@ def command_process(ctx: CLIContext) -> int:
                     logger.debug("Wrote `%s`", target)
                     size = decimal(target.stat().st_size)
                     took = duration(time.monotonic() - started)
-                    report.item_done(
-                        target.relative_to(parquet_dir).as_posix(),
-                        f"{size}, {took}",
-                    )
+                    path = target.relative_to(parquet_dir).as_posix()
+                    report.item_done(member.name, f"{path}  {size} in {took}")
                 finally:
                     # Free in-memory CSV bytes before the next extraction
                     del extracted
@@ -391,6 +386,7 @@ def command_process(ctx: CLIContext) -> int:
     elapsed = time.monotonic() - began
     done = len(members) - failed
     summarize(
+        "Processed",
         "day",
         done,
         len(members),

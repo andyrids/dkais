@@ -5,9 +5,10 @@ immutable: false
 recommended-context-tokens: 900
 ---
 
-# dkais [`dkais`]
+# DK AIS [`dkais`]
 
-Download & process Danish Maritime Authority AIS dataset.
+This Python package enables the download of historic AIS data provided by the
+Danish Maritime Authority and its processing into typed Parquet.
 
 This project adheres to [YAGNI](docs/standard-yagni.md) principles.
 

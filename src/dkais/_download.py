@@ -99,6 +99,7 @@ def download_archives(
     stop = threading.Event()
 
     def fetch(archive: Archive) -> None:
+        reporter.item_started(archive.name)
         path = archive.local_path(raw_dir)
         path.parent.mkdir(parents=True, exist_ok=True)
         began = time.monotonic()

@@ -17,8 +17,13 @@ class FakeReporter:
     def __init__(self) -> None:
         """Start with nothing reported."""
         self.bytes = 0
+        self.started: list[str] = []
         self.done: list[str] = []
         self.failed: list[str] = []
+
+    def item_started(self, name: str) -> None:
+        """Record a started archive."""
+        self.started.append(name)
 
     def advance(self, n: int) -> None:
         """Count transferred bytes."""
@@ -73,6 +78,7 @@ def test_download_reports_each_archive(tmp_path: Path) -> None:
     failed = _download.download_archives(client, archives, tmp_path, reporter)
 
     assert failed == []
+    assert sorted(reporter.started) == [a.name for a in archives]
     assert sorted(reporter.done) == [a.name for a in archives]
     assert reporter.bytes == 17 + 18
     assert all(_download.is_downloaded(a, tmp_path) for a in archives)

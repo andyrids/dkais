@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > - `Fixed` for any bug fixes.
 > - `Security` in case of vulnerabilities.
 
-## [Unreleased]
+## [0.1.0] - 2026-10-24
 
 ### Added
 
@@ -31,7 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `download`/`process` output is cargo-style on a terminal, plain lines when not a terminal.
+- `download`/`process` output is minimal on a terminal (one transient progress line, `warning:`/`error:`
+  messages, one summary), plain lines when not a terminal.
 - Expected failures print one line; tracebacks & verbose logs only with `--debug`.
 - Summaries go to STDOUT, as a `key=value` line when STDOUT is not a terminal.
 

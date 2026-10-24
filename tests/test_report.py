@@ -27,30 +27,30 @@ def test_duration(seconds: float, text: str) -> None:
     assert _report.duration(seconds) == text
 
 
-def test_event_wraps_with_hanging_indent() -> None:
+def test_notice_wraps_with_hanging_indent() -> None:
     """Long messages wrap under the message, with no trailing spaces."""
-    console = _console(terminal=False, width=40)
-    _report.event(console, "Failed", "red", "word " * 12)
+    console = _console(terminal=True, width=40)
+    _report.notice(console, "warning", "yellow", "word " * 12)
 
     lines = console.export_text().splitlines()
-    assert lines[0].startswith("      Failed word")
-    assert all(line.startswith(" " * 13) for line in lines[1:])
+    assert lines[0].startswith("warning: word")
+    assert all(line.startswith(" " * 9 + "word") for line in lines[1:])
     assert len(lines) > 1
     assert not any(line.endswith(" ") for line in lines)
 
 
 def test_notice_is_plain_off_a_terminal() -> None:
-    """Off a terminal, events are `VERB: message` lines that never wrap."""
+    """Off a terminal, notices are `level: message` lines that never wrap."""
     console = _console(terminal=False, width=20)
-    _report.notice(console, "Warning", "yellow", "a long warning message")
-    assert console.export_text() == "WARNING: a long warning message\n"
+    _report.notice(console, "warning", "yellow", "a long warning message")
+    assert console.export_text() == "warning: a long warning message\n"
 
 
 @pytest.mark.parametrize("terminal", [True, False])
 def test_event_handler_renders_records(
     monkeypatch: pytest.MonkeyPatch, terminal: bool
 ) -> None:
-    """Records render as events; only `exc_info` adds a traceback."""
+    """Records render as notices; only `exc_info` adds a traceback."""
     console = _console(terminal=terminal, width=120)
     monkeypatch.setattr(_report, "GLOBAL_CONSOLE", console)
     logger = logging.getLogger("dkais.test_report")
@@ -64,11 +64,7 @@ def test_event_handler_renders_records(
         logger.exception("Unexpected error")
 
     text = console.export_text()
-    if terminal:
-        assert "     Warning Slow `x.zip`" in text
-        assert "       Error Unexpected error" in text
-    else:
-        assert "WARNING: Slow `x.zip`\nERROR: Unexpected error" in text
+    assert "warning: Slow `x.zip`\nerror: Unexpected error\n" in text
     assert "ValueError: boom" in text
 
 
@@ -77,8 +73,9 @@ def test_plain_reporter_lines(monkeypatch: pytest.MonkeyPatch) -> None:
     console = _console(terminal=False)
     monkeypatch.setattr(_report, "GLOBAL_CONSOLE", console)
 
-    with _report.reporter("Download", "Downloaded", 2, total=10) as report:
+    with _report.reporter("download", 2, total=10) as report:
         assert isinstance(report, _report.PlainReporter)
+        report.item_started("a.zip")
         report.advance(10)
         report.item_done("a.zip", "4 B in 0.1s")
         report.item_failed("b.zip", OSError("disk full\nmore detail"))
@@ -88,19 +85,23 @@ def test_plain_reporter_lines(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-def test_live_reporter_prints_events(monkeypatch: pytest.MonkeyPatch) -> None:
-    """On a terminal, items print cargo lines above a transient bar."""
+def test_live_reporter_prints_only_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """On a terminal, only failures print a line above the transient bar."""
     console = _console(terminal=True)
     monkeypatch.setattr(_report, "GLOBAL_CONSOLE", console)
 
-    with _report.reporter("Process", "Processed", 2) as report:
+    with _report.reporter("process", 2) as report:
         assert isinstance(report, _report.LiveReporter)
-        report.item_done("YEAR=2026/a.parquet", "1 MB, 0.1s")
+        report.item_started("a.csv")
+        report.item_done("a.csv", "a.parquet  1 MB in 0.1s")
+        report.item_started("b.csv")
         report.item_failed("b.csv", ValueError("bad row"))
 
     text = console.export_text()
-    assert "   Processed YEAR=2026/a.parquet (1 MB, 0.1s)" in text
-    assert "      Failed b.csv: bad row" in text
+    assert "error: failed to process `b.csv`: bad row" in text
+    assert "1 MB in 0.1s" not in text
 
 
 def test_summarize_plain_is_key_value(
@@ -113,35 +114,37 @@ def test_summarize_plain_is_key_value(
 
     dest = Path("D:/My Data/raw")
     fields = {"downloaded": 7, "failed": 1, "dest": dest}
-    _report.summarize("archive", 7, 8, " in 1.0s", dest, fields)
+    _report.summarize("Downloaded", "archive", 7, 8, " in 1.0s", dest, fields)
 
-    assert err.export_text() == "FAILED: 1 of 8 archives, re-run to retry\n"
+    assert err.export_text() == (
+        "error: 1 of 8 archives failed, re-run to retry\n"
+    )
     assert out.export_text() == f'downloaded=7 failed=1 dest="{dest}"\n'
 
 
-def test_summarize_terminal_is_finished_line(
+def test_summarize_terminal_is_one_line(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """On a terminal, STDOUT gets one cargo `Finished` line."""
+    """On a terminal, STDOUT gets one `✓ Processed …` line."""
     err, out = _console(terminal=True), _console(terminal=True, width=120)
     monkeypatch.setattr(_report, "GLOBAL_CONSOLE", err)
     monkeypatch.setattr(_report, "CLI_CONSOLE", out)
 
     dest = Path("D:/raw")
-    _report.summarize("day", 9, 9, " in 1.0s", dest, {})
+    _report.summarize("Processed", "day", 9, 9, " in 1.0s", dest, {})
 
     assert err.export_text() == ""
-    assert out.export_text() == f"    Finished 9 days in 1.0s → {dest}\n"
+    assert out.export_text() == f"✓ Processed 9 days in 1.0s → {dest}\n"
 
 
 def test_events_from_threads_never_interleave() -> None:
-    """A wrapped event's lines stay together under concurrent printing."""
-    console = _console(terminal=False, width=40)
+    """A wrapped notice's lines stay together under concurrent printing."""
+    console = _console(terminal=True, width=40)
     message = "word " * 15
 
     def emit() -> None:
         for _ in range(20):
-            _report.event(console, "Warning", "yellow", message)
+            _report.notice(console, "warning", "yellow", message)
 
     threads = [threading.Thread(target=emit) for _ in range(8)]
     for thread in threads:
@@ -150,6 +153,6 @@ def test_events_from_threads_never_interleave() -> None:
         thread.join()
 
     lines = console.export_text().splitlines()
-    heads = [i for i, line in enumerate(lines) if "Warning" in line]
+    heads = [i for i, line in enumerate(lines) if "warning:" in line]
     assert len(heads) == 8 * 20
     assert {b - a for a, b in itertools.pairwise(heads)} == {3}

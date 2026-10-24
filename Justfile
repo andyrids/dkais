@@ -39,3 +39,8 @@ git-prune:
 [group("DEV")]
 symlink-agents:
     @uv run python -c "import pathlib; p=pathlib.Path('CLAUDE.md'); p.unlink(missing_ok=True); p.symlink_to('AGENTS.md')"
+
+[doc("Read & check Parquet files in `$DKAIS_DATA_DIR`")]
+[group("TEST")]
+test-processed:
+    uv run ./scripts/read_parquet.py
