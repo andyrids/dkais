@@ -10,11 +10,11 @@ import json
 import logging
 import re
 import sys
+import time
 import zipfile
 from collections import deque
 from collections.abc import Generator
 from concurrent.futures import Future, ThreadPoolExecutor
-from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -23,22 +23,11 @@ import polars as pl
 import psutil
 from rich import box
 from rich.filesize import decimal
-from rich.progress import (
-    BarColumn,
-    DownloadColumn,
-    MofNCompleteColumn,
-    Progress,
-    ProgressColumn,
-    SpinnerColumn,
-    TextColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn,
-    TransferSpeedColumn,
-)
 from rich.table import Table
 
 from dkais import _download, _process, _s3, exceptions
 from dkais._core import CLIContext, CLIGFormatter, ExitCode, resolve_data_dir
+from dkais._report import duration, notice, plural, reporter, summarize
 from dkais.logging import GLOBAL_CONSOLE
 
 if TYPE_CHECKING:
@@ -108,31 +97,6 @@ def _requires_selection(ctx: CLIContext) -> bool:
         args.parser.print_help(sys.stderr)
         return False
     return True
-
-
-@contextmanager
-def _setup_progress(
-    *columns: ProgressColumn,
-) -> Generator[Progress, None, None]:
-    """Create a Rich progress display on STDERR.
-
-    NOTE: Like logs, progress bars and spinners are diagnostic metadata, which
-    are kept on STDERR and share the same console instance (`GLOBAL_CONSOLE`).
-
-    Args:
-        columns: The progress columns to render.
-
-    Yields:
-        A Rich `Progress` instance for use within a context manager.
-    """
-    progress = Progress(
-        *columns,
-        console=GLOBAL_CONSOLE,
-        disable=not GLOBAL_CONSOLE.is_terminal,
-        transient=False,
-    )
-    with progress:
-        yield progress
 
 
 def command_list(ctx: CLIContext) -> int:
@@ -237,17 +201,25 @@ def command_download(ctx: CLIContext) -> int:
         logger.warning("No archives in the selected range")
         return ExitCode.EX_OK
 
-    GLOBAL_CONSOLE.rule("[cyan]dkais download")
+    pending = _download.pending_archives(archives, raw_dir)
+    present = len(archives) - len(pending)
+    notice(
+        GLOBAL_CONSOLE,
+        "Resolving",
+        "cyan",
+        f"{plural(len(archives), 'archive')} in range ({present} already "
+        "present)",
+    )
+    began = time.monotonic()
     try:
-        with _setup_progress(
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            DownloadColumn(),
-            TransferSpeedColumn(),
-            TimeRemainingColumn(elapsed_when_finished=True),
-        ) as progress:
+        with reporter(
+            "Download",
+            "Downloaded",
+            len(pending),
+            total=sum(a.size for a in pending),
+        ) as report:
             failed = _download.download_archives(
-                client, archives, raw_dir, progress, args.jobs
+                client, pending, raw_dir, report, args.jobs
             )
     except KeyboardInterrupt:
         logger.warning(
@@ -255,15 +227,26 @@ def command_download(ctx: CLIContext) -> int:
         )
         return ExitCode.EX_INTERRUPT
 
-    if failed:
-        logger.error(
-            "%d of %d archives failed to download", len(failed), len(archives)
-        )
-        return ExitCode.EX_FAILURE
-
-    size = decimal(sum(a.size for a in archives))
-    ctx.console.print(f"{len(archives)} archives ({size}) in {raw_dir}")
-    return ExitCode.EX_OK
+    elapsed = time.monotonic() - began
+    size = sum(a.size for a in pending if a not in failed)
+    done = len(pending) - len(failed)
+    summarize(
+        "archive",
+        done,
+        len(pending),
+        f" ({decimal(size)}) in {duration(elapsed)}"
+        + (f", {present} already present" if present else ""),
+        raw_dir,
+        {
+            "downloaded": done,
+            "bytes": size,
+            "already_present": present,
+            "failed": len(failed),
+            "elapsed": f"{elapsed:.1f}s",
+            "dest": raw_dir,
+        },
+    )
+    return ExitCode.EX_FAILURE if failed else ExitCode.EX_OK
 
 
 def _extract_ahead(
@@ -331,16 +314,28 @@ def command_process(ctx: CLIContext) -> int:
         if (archive := _s3.parse_key(path.name, path.stat().st_size))
         and archive.overlaps(args.start, args.end)
     ]
-    members = [
+    in_range = [
         member
         for path in zip_paths
         for member in _process.list_members(path, args.start, args.end)
+    ]
+    members = [
+        member
+        for member in in_range
         if args.force or not member.target(parquet_dir).exists()
     ]
     if not members:
         logger.warning("Nothing to process - download first or use `--force`")
         return ExitCode.EX_OK
+    skipped = len(in_range) - len(members)
 
+    notice(
+        GLOBAL_CONSOLE,
+        "Resolving",
+        "cyan",
+        f"{plural(len(in_range), 'day')} in range "
+        f"({skipped} already processed)",
+    )
     _process.clean_stale(parquet_dir, tmp_dir)
     available = psutil.virtual_memory().available
     logger.debug(
@@ -348,44 +343,41 @@ def command_process(ctx: CLIContext) -> int:
         _process.INFLATE.__name__,
         decimal(available),
     )
-    GLOBAL_CONSOLE.rule("[cyan]dkais process")
     failed = 0
+    began = time.monotonic()
     pool = ThreadPoolExecutor(max_workers=1)
     try:
-        with _setup_progress(
-            SpinnerColumn(finished_text="[green]✓"),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            MofNCompleteColumn(),
-            TimeElapsedColumn(),
-            TimeRemainingColumn(),
-        ) as progress:
-            overall = progress.add_task("[cyan]Process", total=len(members))
+        with reporter("Process", "Processed", len(members)) as report:
             for member, extracted in _extract_ahead(
                 pool, members, tmp_dir, available
             ):
-                step = progress.add_task(
-                    f"{member.zip_path.name} - {member.day}"
-                )
+                started = time.monotonic()
                 try:
                     target = _process.convert(
                         member, _result(extracted), parquet_dir
                     )
-                    logger.debug("Wrote `%s`", target)
                 except (
                     exceptions.Error,
                     pl.exceptions.PolarsError,
                     zipfile.BadZipFile,
                     OSError,
-                ):
-                    logger.exception("Failed to process `%s`", member.name)
+                ) as e:
+                    logger.debug(
+                        "Failed to process `%s`", member.name, exc_info=True
+                    )
+                    report.item_failed(member.name, e)
                     failed += 1
+                else:
+                    logger.debug("Wrote `%s`", target)
+                    size = decimal(target.stat().st_size)
+                    took = duration(time.monotonic() - started)
+                    report.item_done(
+                        target.relative_to(parquet_dir).as_posix(),
+                        f"{size}, {took}",
+                    )
                 finally:
-                    progress.remove_task(step)
                     # Free in-memory CSV bytes before the next extraction
                     del extracted
-                progress.advance(overall)
-            progress.update(overall, description="[green]Process")
     except KeyboardInterrupt:
         logger.warning(
             "Interrupted - partial output discarded, re-run to resume"
@@ -396,12 +388,24 @@ def command_process(ctx: CLIContext) -> int:
         pool.shutdown(wait=True, cancel_futures=True)
         _process.clean_stale(parquet_dir, tmp_dir)
 
-    if failed:
-        logger.error("%d of %d days failed to process", failed, len(members))
-        return ExitCode.EX_FAILURE
-
-    ctx.console.print(f"{len(members)} days processed in {parquet_dir}")
-    return ExitCode.EX_OK
+    elapsed = time.monotonic() - began
+    done = len(members) - failed
+    summarize(
+        "day",
+        done,
+        len(members),
+        f" in {duration(elapsed)}"
+        + (f", {skipped} already processed" if skipped else ""),
+        parquet_dir,
+        {
+            "processed": done,
+            "already_processed": skipped,
+            "failed": failed,
+            "elapsed": f"{elapsed:.1f}s",
+            "dest": parquet_dir,
+        },
+    )
+    return ExitCode.EX_FAILURE if failed else ExitCode.EX_OK
 
 
 def add_subparsers(

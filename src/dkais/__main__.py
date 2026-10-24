@@ -1,6 +1,7 @@
 """Main entry point for the dkais CLI."""
 
 import argparse
+import io
 import logging
 import sys
 import textwrap
@@ -34,6 +35,12 @@ class CLIArgumentParser(argparse.ArgumentParser):
 
 def main() -> NoReturn:
     """Provide a unified `dkais` CLI entrypoint - list, download, process."""
+
+    # Redirected streams default to the locale encoding (cp1252 on Windows),
+    # which cannot encode the output's glyphs (e.g. `✓`, `→`)
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(encoding="utf-8")
 
     # Provides a base parser for shared arguments across subcommands
     base_parser = CLIArgumentParser(add_help=False)

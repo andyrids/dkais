@@ -28,3 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `dkais process` command converting all CSV dialects to `YEAR=/MONTH=` Parquet.
 - `dkais process` extracts one day ahead, in memory when RAM allows, with zlib-ng.
 - `scripts/` profiling & benchmark tools for `dkais process`.
+
+### Changed
+
+- `download`/`process` output is cargo-style on a terminal, plain lines when not a terminal.
+- Expected failures print one line; tracebacks & verbose logs only with `--debug`.
+- Summaries go to STDOUT, as a `key=value` line when STDOUT is not a terminal.
+
+### Fixed
+
+- Redirected output no longer crashes on non-ASCII glyphs under Windows cp1252.
