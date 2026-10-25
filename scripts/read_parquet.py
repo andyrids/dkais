@@ -28,5 +28,5 @@ pprint(october.collect_schema().to_python(), expand_all=True)
 count = october.select(pl.len()).collect().item()
 sys.stdout.write(f"ROW COUNT: {count:,}\n\n")
 
-sys.stdout.write(f"FIRST 10 ROWS:\n")
+sys.stdout.write("FIRST 10 ROWS:\n")
 pprint(october.head(10).collect(), expand_all=True)

@@ -11,7 +11,9 @@ ships.
 - [Wikipedia Article](https://en.wikipedia.org/wiki/Automatic_identification_system): Overview of
   AIS, including its history, functionality and applications.
 
+<!-- pyml disable MD034 -->
 https://github.com/user-attachments/assets/b809ad7f-fca4-404a-9a1e-20e29a72d7e8
+<!-- pyml enable MD034 -->
 
 ## Usage
 
