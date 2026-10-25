@@ -11,6 +11,8 @@ ships.
 - [Wikipedia Article](https://en.wikipedia.org/wiki/Automatic_identification_system): Overview of
   AIS, including its history, functionality and applications.
 
+https://github.com/user-attachments/assets/b809ad7f-fca4-404a-9a1e-20e29a72d7e8
+
 ## Usage
 
 `dkais` mirrors the public bucket to a data directory and converts each daily CSV to Parquet.
