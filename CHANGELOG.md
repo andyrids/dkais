@@ -31,8 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `download`/`process` output is minimal on a terminal (one transient progress line, `warning:`/`error:`
-  messages, one summary), plain lines when not a terminal.
+- `download`/`process` output is minimal on a terminal (one transient progress line,
+  `warning:`/`error:` messages, one summary), plain lines when not a terminal.
 - Expected failures print one line; tracebacks & verbose logs only with `--debug`.
 - Summaries go to STDOUT, as a `key=value` line when STDOUT is not a terminal.
 - `list` warns when no data directory is set instead of silently omitting local state.
@@ -40,3 +40,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Redirected output no longer crashes on non-ASCII glyphs under Windows cp1252.
+- `dkais download --jobs` rejects values below 1 with a usage error.
+- `dkais.__version__` falls back to `0.0.0+unknown` when package metadata is unavailable.

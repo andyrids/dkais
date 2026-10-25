@@ -104,7 +104,7 @@ def test_live_reporter_prints_only_failures(
     assert "1 MB in 0.1s" not in text
 
 
-def test_summarize_plain_is_key_value(
+def test_summarise_plain_is_key_value(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Off a terminal, STDOUT gets `key=value` & STDERR the failed count."""
@@ -114,7 +114,7 @@ def test_summarize_plain_is_key_value(
 
     dest = Path("D:/My Data/raw")
     fields = {"downloaded": 7, "failed": 1, "dest": dest}
-    _report.summarize("Downloaded", "archive", 7, 8, " in 1.0s", dest, fields)
+    _report.summarise("Downloaded", "archive", 7, 8, " in 1.0s", dest, fields)
 
     assert err.export_text() == (
         "error: 1 of 8 archives failed, re-run to retry\n"
@@ -122,7 +122,7 @@ def test_summarize_plain_is_key_value(
     assert out.export_text() == f'downloaded=7 failed=1 dest="{dest}"\n'
 
 
-def test_summarize_terminal_is_one_line(
+def test_summarise_terminal_is_one_line(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """On a terminal, STDOUT gets one `✓ Processed …` line."""
@@ -131,7 +131,7 @@ def test_summarize_terminal_is_one_line(
     monkeypatch.setattr(_report, "CLI_CONSOLE", out)
 
     dest = Path("D:/raw")
-    _report.summarize("Processed", "day", 9, 9, " in 1.0s", dest, {})
+    _report.summarise("Processed", "day", 9, 9, " in 1.0s", dest, {})
 
     assert err.export_text() == ""
     assert out.export_text() == f"✓ Processed 9 days in 1.0s → {dest}\n"
