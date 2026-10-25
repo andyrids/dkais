@@ -53,6 +53,23 @@ def test_parse_dates_rejects_invalid(value: str) -> None:
         _cli._parse_start(value)
 
 
+def test_parse_jobs() -> None:
+    """A positive integer is a valid worker count."""
+    assert _cli._parse_jobs("1") == 1
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "x"])
+def test_parse_jobs_rejects_invalid(value: str) -> None:
+    """Non-positive or non-integer counts are argparse type errors."""
+    with pytest.raises(argparse.ArgumentTypeError):
+        _cli._parse_jobs(value)
+
+
+def test_main_maps_invalid_jobs_to_usage() -> None:
+    """An invalid `--jobs` fails at parse time with a usage exit code."""
+    assert _run_main(["download", "--all", "--jobs", "0"]) == ExitCode.EX_USAGE
+
+
 def test_resolve_data_dir_env_fallback(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

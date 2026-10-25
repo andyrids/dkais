@@ -27,7 +27,7 @@ from rich.table import Table
 
 from dkais import _download, _process, _s3, exceptions
 from dkais._core import CLIContext, CLIGFormatter, ExitCode, resolve_data_dir
-from dkais._report import duration, info, plural, reporter, summarize
+from dkais._report import duration, info, plural, reporter, summarise
 from dkais.logging import GLOBAL_CONSOLE
 
 if TYPE_CHECKING:
@@ -75,6 +75,18 @@ def _parse_start(value: str) -> date:
 def _parse_end(value: str) -> date:
     """Parse an `--end` value to the last day it covers."""
     return _parse_date(value, end=True)
+
+
+def _parse_jobs(value: str) -> int:
+    """Parse a `--jobs` value to a positive worker count."""
+    msg = f"invalid count `{value}` - use an integer >= 1"
+    try:
+        jobs = int(value)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(msg) from e
+    if jobs < 1:
+        raise argparse.ArgumentTypeError(msg)
+    return jobs
 
 
 def _requires_selection(ctx: CLIContext) -> bool:
@@ -230,7 +242,7 @@ def command_download(ctx: CLIContext) -> int:
     elapsed = time.monotonic() - began
     size = sum(a.size for a in pending if a not in failed)
     done = len(pending) - len(failed)
-    summarize(
+    summarise(
         "Downloaded",
         "archive",
         done,
@@ -389,7 +401,7 @@ def command_process(ctx: CLIContext) -> int:
 
     elapsed = time.monotonic() - began
     done = len(members) - failed
-    summarize(
+    summarise(
         "Processed",
         "day",
         done,
@@ -470,7 +482,7 @@ def add_subparsers(
             parser.add_argument(
                 "-j",
                 "--jobs",
-                type=int,
+                type=_parse_jobs,
                 default=4,
                 metavar="N",
                 help="Concurrent file downloads (default: 4)",

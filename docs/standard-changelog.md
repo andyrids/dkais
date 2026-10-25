@@ -19,3 +19,4 @@ tags: [CHANGELOG, documentation, semver]
   - `Fixed` for any bug fixes
   - `Security` in case of vulnerabilities
 - Brief sections summaries, ideally within 100 characters
+- Additions go under the latest `[SemVer] - yyyy-mm-dd` heading, if that version is unreleased

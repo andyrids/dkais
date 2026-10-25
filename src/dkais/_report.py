@@ -331,7 +331,7 @@ def _field(value: object) -> str:
     return f'"{text}"' if " " in text else text
 
 
-def summarize(
+def summarise(
     verb: str,
     noun: str,
     done: int,
