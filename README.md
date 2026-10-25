@@ -8,8 +8,7 @@ Telecommunication Union (ITU) and adopted by the International Maritime Organiza
 a VHF-based navigation and anti-collision tool making it possible to exchange information between
 ships.
 
-- [Wikipedia Article](https://en.wikipedia.org/wiki/Automatic_identification_system): Overview of
-  AIS, including its history, functionality and applications.
+For more information about AIS, including its history, functionality and applications - see [Wikipedia](https://en.wikipedia.org/wiki/Automatic_identification_system).
 
 <!-- pyml disable MD034 -->
 https://github.com/user-attachments/assets/b809ad7f-fca4-404a-9a1e-20e29a72d7e8
