@@ -2,7 +2,7 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 [windows]
-set shell := ["cmd.exe", "/c"]
+set shell := ["pwsh.exe", "-c"]
 
 set dotenv-load := true
 
@@ -44,3 +44,24 @@ symlink-agents:
 [group("TEST")]
 test-processed:
     uv run ./scripts/read_parquet.py
+
+[doc("Demo `dkais` CLI")]
+[group("DEMO")]
+demo:
+    uv run dkais -h
+    @echo "" && sleep 2
+    uv run dkais list --start 2026-10-01 --end 2026-10-02
+    @echo "" && sleep 2 && clear
+    uv run dkais list --data-dir 'C:/Users/andre/Data/AISDK' --start 2026-10-01 --end 2026-10-02
+    @echo "" && sleep 2 && clear
+    uv run dkais download --data-dir 'C:/Users/andre/Data/AISDK' --start 2026-10-01 --end 2026-10-01
+    @echo "" && sleep 2 && clear
+    uv run dkais download --data-dir 'C:/Users/andre/Data/AISDK' --start 2026-10-01 --end 2026-10-01
+    @echo "" && sleep 2 && clear
+    uv run dkais list --data-dir 'C:/Users/andre/Data/AISDK' --start 2026-10-01 --end 2026-10-05
+    @echo "" && sleep 2 && clear
+    uv run dkais process --data-dir 'C:/Users/andre/Data/AISDK' --start 2026-10-01 --end 2026-10-05
+    @echo "" && sleep 2 && clear
+    uv run dkais list --data-dir 'C:/Users/andre/Data/AISDK' --start 2026-10-01 --end 2026-10-05
+    @echo "" && sleep 2 && clear
+    uv run scripts/read_parquet.py

@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > - `Fixed` for any bug fixes.
 > - `Security` in case of vulnerabilities.
 
-## [0.1.0] - 2026-10-24
+## [0.1.0] - 2026-10-25
 
 ### Added
 
@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   messages, one summary), plain lines when not a terminal.
 - Expected failures print one line; tracebacks & verbose logs only with `--debug`.
 - Summaries go to STDOUT, as a `key=value` line when STDOUT is not a terminal.
+- `list` warns when no data directory is set instead of silently omitting local state.
 
 ### Fixed
 

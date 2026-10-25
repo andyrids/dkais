@@ -230,6 +230,22 @@ def test_list_table_shows_processed_of_period(
     assert rows[1].split()[-1] == "1/31"
 
 
+def test_list_warns_without_data_dir(
+    data_dir: Path,
+    capsys: pytest.CaptureFixture,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Without a data dir, `list` omits local state & says why."""
+    archive = _s3.parse_key("2006/aisdk-2006-03.zip", 3)
+    with (
+        mock.patch(f"{CLI}._s3.make_client"),
+        mock.patch(f"{CLI}._s3.list_archives", return_value=[archive]),
+    ):
+        assert _run_main(["list"]) == ExitCode.EX_OK
+    assert "Processed" not in capsys.readouterr().out
+    assert "DKAIS_DATA_DIR" in caplog.text
+
+
 def test_list_json_includes_local_state(
     data_dir: Path, capsys: pytest.CaptureFixture
 ) -> None:

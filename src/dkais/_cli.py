@@ -115,6 +115,10 @@ def command_list(ctx: CLIContext) -> int:
         data_dir: Path | None = resolve_data_dir(args.data_dir)
     except exceptions.DataDirNotSetError:
         data_dir = None
+        logger.warning(
+            "No data dir - set `--data-dir` or `DKAIS_DATA_DIR` "
+            "to show local state"
+        )
 
     rows: list[dict[str, Any]] = []
     for archive in archives:
