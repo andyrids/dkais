@@ -31,7 +31,7 @@ def configure_cli_logging(level: int = logging.WARNING) -> None:
     """Configure CLI logging using the `config.toml` settings.
 
     NOTE: CLI logs are prevented from propagating to the root logger to avoid
-    duplication.
+    duplication. Above `DEBUG`, records render as `dkais._report` notices.
 
     Args:
         level: The desired logging level. Defaults to `logging.WARNING`.
@@ -41,7 +41,13 @@ def configure_cli_logging(level: int = logging.WARNING) -> None:
     reconfigure(stderr=True)
 
     CONFIG_STR = CONFIG_PATH.read_text(encoding="utf-8")
-    logging.config.dictConfig(tomllib.loads(CONFIG_STR))
+    config = tomllib.loads(CONFIG_STR)
+
+    # Tracebacks & call sites only with `--debug`, else concise events
+    debug = level <= logging.DEBUG
+    handler = "rich-verbose-handler" if debug else "event-handler"
+    config["loggers"]["dkais"]["handlers"] = [handler]
+    logging.config.dictConfig(config)
 
     logger = logging.getLogger("dkais")
     logger.setLevel(level)

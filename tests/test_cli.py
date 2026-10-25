@@ -163,7 +163,7 @@ def test_process_extracts_ahead(
 
 
 def test_process_reports_failed_days(
-    data_dir: Path, write_zip: ZipWriter
+    data_dir: Path, write_zip: ZipWriter, capsys: pytest.CaptureFixture
 ) -> None:
     """A day with an unknown dialect fails the run with exit code 1."""
     write_zip(
@@ -173,11 +173,37 @@ def test_process_reports_failed_days(
     argv = ["process", "--all", "--data-dir", str(data_dir)]
     assert _run_main(argv) == ExitCode.EX_FAILURE
 
+    # Not a terminal, so plain lines - no traceback for an expected failure
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert "[1/1] aisdk-2026-10-18.csv  FAILED: " in output
+    assert "error: 1 of 1 day failed, re-run to retry" in output
+    assert "Traceback" not in output
+    assert "processed=0 already_processed=0 failed=1 " in captured.out
 
-def test_list_json_includes_local_state(
+
+def test_download_summary_is_key_value(
     data_dir: Path, capsys: pytest.CaptureFixture
 ) -> None:
-    """`list --json` reports download & processed state per archive."""
+    """Off a terminal, the download summary is one `key=value` line."""
+    archive = _s3.parse_key("aisdk-2026-10-18.zip", 5)
+    with (
+        mock.patch(f"{CLI}._s3.make_client"),
+        mock.patch(f"{CLI}._s3.list_archives", return_value=[archive]),
+        mock.patch(f"{CLI}._download.download_archives", return_value=[]),
+    ):
+        exit_code = _run_main(
+            ["download", "--all", "--data-dir", str(data_dir)]
+        )
+    assert exit_code == ExitCode.EX_OK
+    summary = capsys.readouterr().out.splitlines()[-1]
+    assert summary.startswith(
+        "downloaded=1 bytes=5 already_present=0 failed=0 elapsed="
+    )
+
+
+def _list_one_processed_day(data_dir: Path, *flags: str) -> int:
+    """Run `list` over a downloaded March 2006 archive with 1 day processed."""
     archive = _s3.parse_key("2006/aisdk-2006-03.zip", 3)
     assert archive is not None
     path = archive.local_path(data_dir / "raw")
@@ -191,9 +217,40 @@ def test_list_json_includes_local_state(
         mock.patch(f"{CLI}._s3.make_client"),
         mock.patch(f"{CLI}._s3.list_archives", return_value=[archive]),
     ):
-        exit_code = _run_main(["list", "--json", "--data-dir", str(data_dir)])
+        return _run_main(["list", *flags, "--data-dir", str(data_dir)])
 
-    assert exit_code == ExitCode.EX_OK
+
+def test_list_table_shows_processed_of_period(
+    data_dir: Path, capsys: pytest.CaptureFixture
+) -> None:
+    """`list` shows processed days out of the days the archive covers."""
+    assert _list_one_processed_day(data_dir) == ExitCode.EX_OK
+    header, *rows = capsys.readouterr().out.strip().splitlines()
+    assert header.split()[-1] == "Processed"
+    assert rows[1].split()[-1] == "1/31"
+
+
+def test_list_warns_without_data_dir(
+    data_dir: Path,
+    capsys: pytest.CaptureFixture,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Without a data dir, `list` omits local state & says why."""
+    archive = _s3.parse_key("2006/aisdk-2006-03.zip", 3)
+    with (
+        mock.patch(f"{CLI}._s3.make_client"),
+        mock.patch(f"{CLI}._s3.list_archives", return_value=[archive]),
+    ):
+        assert _run_main(["list"]) == ExitCode.EX_OK
+    assert "Processed" not in capsys.readouterr().out
+    assert "DKAIS_DATA_DIR" in caplog.text
+
+
+def test_list_json_includes_local_state(
+    data_dir: Path, capsys: pytest.CaptureFixture
+) -> None:
+    """`list --json` reports download & processed state per archive."""
+    assert _list_one_processed_day(data_dir, "--json") == ExitCode.EX_OK
     assert json.loads(capsys.readouterr().out) == [
         {
             "key": "2006/aisdk-2006-03.zip",

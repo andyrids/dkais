@@ -1,7 +1,7 @@
 [project]
 name = "dkais"
 dynamic = ["version"]
-description = "Management tool for Danish Maritime Authority historical AIS data."
+description = "CLI for accessing historical AIS data maintained by the Danish Maritime Authority."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICEN[CS]E*", "COPYRIGHT"]

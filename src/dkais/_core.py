@@ -15,6 +15,7 @@ from dkais import exceptions
 logger = logging.getLogger(__package__)
 
 DATA_DIR_ENV = "DKAIS_DATA_DIR"
+"""Environment variable for the data directory."""
 
 
 class ExitCode(IntEnum):
@@ -33,7 +34,7 @@ class ExitCode(IntEnum):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class CLIContext:
-    """Centralized state for the CLI commands.
+    """Centralised state for the CLI commands.
 
     Attributes:
         args: The parsed command-line arguments from argparse.

@@ -1,18 +1,18 @@
-# Danish Maritime Authority AIS dataset
+# DK AIS [`dkais`]
 
 This Python package streamlines the download and processing of historical Automatic
 Identification System (AIS) data provided by the Danish Maritime Authority (DMA).
 
-**For more information about AIS, see:**
+AIS is a maritime navigation safety communications system standardised by the International
+Telecommunication Union (ITU) and adopted by the International Maritime Organization (IMO). AIS is
+a VHF-based navigation and anti-collision tool making it possible to exchange information between
+ships.
 
-- `AIS Message Types <https://arundaleais.github.io/docs/ais/ais_message_types.html>`_: Types of
-  AIS messages used for communication.
-- `Navigation Center <https://www.navcen.uscg.gov/ais-messages>`_: This is an overview of
-  Navigation Systems and Services.
-- `AIS transponders <https://www.imo.org/en/OurWork/Safety/Pages/AIS.aspx>`_: Regulations regarding
-  AIS use, maritime security, and additional information.
-- `Wikipedia Article <https://en.wikipedia.org/wiki/Automatic_identification_system>`_: Here is an
-  overview of AIS, including its history, functionality and applications.
+For more information about AIS, including its history, functionality and applications - see [Wikipedia](https://en.wikipedia.org/wiki/Automatic_identification_system).
+
+<!-- pyml disable MD034 -->
+https://github.com/user-attachments/assets/b809ad7f-fca4-404a-9a1e-20e29a72d7e8
+<!-- pyml enable MD034 -->
 
 ## Usage
 
@@ -37,8 +37,11 @@ so an interrupted run resumes where it stopped. `process` works offline from `<d
 <data-dir>/
   raw/YYYY/aisdk-YYYY-MM[-DD].zip
   parquet/YEAR=2026/MONTH=10/aisdk-2026-10-18.parquet
-  tmp/                                  # extracted CSVs, when RAM is short
+  tmp/
 ```
+
+> [!NOTE]
+> The `tmp/` directory is used for extracted CSVs when RAM is short.
 
 `process` unzips the next day while converting the current one. A day's CSV is held in memory when
 five times its size is available (a 3 GB daily CSV needs ~15 GB), otherwise it is extracted to
@@ -51,6 +54,9 @@ Each Parquet file holds one day: all 26 DMA columns renamed to `UPPER_SNAKE` and
 dialects (comma with 22 columns, header-less semicolon with decimal commas, comma with 26 columns)
 share one output schema.
 
+> [!TIP]
+> See [Features](#features) for a the full schema table and data types.
+
 ```python
 import polars as pl
 
@@ -60,13 +66,8 @@ october = ais.filter(pl.col("YEAR") == 2026, pl.col("MONTH") == 10)
 
 ## Dataset
 
-- [DMA](https://www.dma.dk/safety-at-sea/navigational-information/ais-data)
-- [S3](http://aisdata.ais.dk/)
-
-AIS is a maritime navigation safety communications system standardised by the International
-Telecommunication Union (ITU) and adopted by the International Maritime Organization (IMO). AIS is
-a VHF-based navigation and anti-collision tool making it possible to exchange information between
-ships.
+- [DMA website](https://www.dma.dk/safety-at-sea/navigational-information/ais-data)
+- [AIS S3](http://aisdata.ais.dk/)
 
 ### Metadata
 
@@ -86,31 +87,36 @@ AIS data uncritically, it may be risky.
 
 ### Features
 
-Below are the features in the dataset provided by the DMA
+See the table below, for the original DMA dataset features and the new feature names in the
+typed Parquet files after `dkais` processing.
 
-1. Timestamp - dd/mm/yyyy HH:MM:SS
-2. Type of mobile - Vessel class
-3. MMSI - Maritime Mobile Service Identity (unique 9-digit number)
-4. Latitude - Decimal degrees
-5. Longitude - Decimal degrees
-6. Navigational Status - status (AIS metadata)
-7. ROT - Rate of Turn (AIS metadata)
-8. SOG - Speed Over Ground (AIS metadata)
-9. COG - Course Over Ground (AIS metadata)
-10. Heading - Heading (AIS metadata)
-11. IMO - International Maritime Organization number
-12. Callsign - Callsign of the vessel
-13. Name - Name of the vessel
-14. Ship type - Type of ship (AIS metadata)
-15. Cargo type - Type of cargo (AIS metadata)
-16. Width - Width of the vessel
-17. Length - Length of the vessel
-18. Type of position fixing device
-19. Draught - Draught of the vessel (AIS metadata)
-20. Destination - Destination of the vessel (AIS metadata)
-21. ETA - Estimated Time of Arrival
-22. Data source type
-23. Size A - Length from GPS to the bow
-24. Size B - Length from GPS to the stern
-25. Size C - Length from GPS to starboard side
-26. Size D - Length from GPS to port side
+<!-- pyml disable MD013 -->
+| Original                        | Processed        | Type          | Comment |
+| ------------------------------- | ---------------- | ------------- | ------- |
+| Timestamp | DATETIME | datetime[μs]  | dd/mm/yyyy HH:MM:SS |
+| Type of mobile | MOBILE_TYPE | cat | Vessel class |
+| MMSI | MMSI | i32 | Maritime Mobile Service Identity (unique 9-digit number) |
+| Latitude | LATITUDE | f64 | Decimal degrees, null if 91 (not available) |
+| Longitude | LONGITUDE | f64 | Decimal degrees, null if 181 (not available) |
+| Navigational Status | NAV_STATUS | cat | Navigational status (AIS metadata) |
+| ROT | ROT | f32 | Rate of Turn (AIS metadata) |
+| SOG | SOG | f32 | Speed Over Ground (AIS metadata) |
+| COG | COG | f32 | Course Over Ground (AIS metadata) |
+| Heading | HEADING | i16 | Heading (AIS metadata), null if 511 (not available) |
+| IMO | IMO | i32 | International Maritime Organization number, null if `Unknown`  |
+| Callsign | CALLSIGN | str | Callsign of the vessel, null if `Unknown` |
+| Name | NAME | str | Name of the vessel |
+| Ship type | SHIP_TYPE | cat | Type of ship (AIS metadata) |
+| Cargo type | CARGO_TYPE | cat | Type of cargo (AIS metadata) |
+| Width | WIDTH | i16 | Width of the vessel |
+| Length | LENGTH | i16 | Length of the vessel |
+| Type of position fixing device | POSITION_DEVICE | cat | e.g. GPS, GLONASS, Galileo, Surveyed |
+| Draught | DRAUGHT | f32 | Draught of the vessel (AIS metadata) |
+| Destination | DESTINATION | str | Destination of the vessel (AIS metadata), null if `Unknown` |
+| ETA | ETA | datetime[μs] | Estimated Time of Arrival, dd/mm/yyyy HH:MM:SS |
+| Data source type | DATA_SOURCE | cat | e.g. AIS |
+| A | SIZE_A | i16 | Length from GPS to the bow, null in 22-column files |
+| B | SIZE_B | i16 | Length from GPS to the stern, null in 22-column files |
+| C | SIZE_C | i16 | Length from GPS to starboard side, null in 22-column files |
+| D | SIZE_D | i16 | Length from GPS to port side, null in 22-column files |
+<!-- pyml enable MD013 -->

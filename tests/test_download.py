@@ -6,10 +6,36 @@ from typing import Any
 from unittest import mock
 
 import pytest
-from rich.progress import Progress
 
 from dkais import _download, _s3, exceptions
 from dkais._s3 import Archive
+
+
+class FakeReporter:
+    """Record reporter calls, like `dkais._report.PlainReporter` sees them."""
+
+    def __init__(self) -> None:
+        """Start with nothing reported."""
+        self.bytes = 0
+        self.started: list[str] = []
+        self.done: list[str] = []
+        self.failed: list[str] = []
+
+    def item_started(self, name: str) -> None:
+        """Record a started archive."""
+        self.started.append(name)
+
+    def advance(self, n: int) -> None:
+        """Count transferred bytes."""
+        self.bytes += n
+
+    def item_done(self, name: str, detail: str) -> None:
+        """Record a downloaded archive."""
+        self.done.append(name)
+
+    def item_failed(self, name: str, error: BaseException) -> None:
+        """Record a failed archive."""
+        self.failed.append(name)
 
 
 def _archive(key: str, size: int) -> Archive:
@@ -27,27 +53,35 @@ def _fake_download(
     Path(filename).write_bytes(b"x" * size)
 
 
-def test_download_skips_complete_files(tmp_path: Path) -> None:
-    """Archives with a size-matched local file are not re-downloaded."""
+def test_pending_skips_complete_files(tmp_path: Path) -> None:
+    """Archives with a size-matched local file are not pending."""
     done = _archive("aisdk-2026-10-17.zip", 17)
-    todo = _archive("aisdk-2026-10-18.zip", 18)
-    done.local_path(tmp_path).parent.mkdir(parents=True)
-    done.local_path(tmp_path).write_bytes(b"x" * 17)
+    partial = _archive("aisdk-2026-10-18.zip", 18)
+    todo = _archive("aisdk-2026-10-19.zip", 19)
+    for archive, size in ((done, 17), (partial, 5)):
+        archive.local_path(tmp_path).parent.mkdir(exist_ok=True, parents=True)
+        archive.local_path(tmp_path).write_bytes(b"x" * size)
+
+    pending = _download.pending_archives([done, partial, todo], tmp_path)
+
+    assert pending == [partial, todo]
+
+
+def test_download_reports_each_archive(tmp_path: Path) -> None:
+    """Every archive is downloaded & reported, with its bytes."""
+    archives = [_archive(f"aisdk-2026-10-1{d}.zip", 10 + d) for d in (7, 8)]
 
     client = mock.MagicMock()
     client.download_file.side_effect = _fake_download
-    progress = Progress(disable=True)
+    reporter = FakeReporter()
 
-    failed = _download.download_archives(
-        client, [done, todo], tmp_path, progress
-    )
+    failed = _download.download_archives(client, archives, tmp_path, reporter)
 
     assert failed == []
-    assert client.download_file.call_count == 1
-    assert client.download_file.call_args.args[1] == todo.key
-    assert _download.is_downloaded(todo, tmp_path)
-    overall = progress.tasks[0]
-    assert overall.total == overall.completed == 18
+    assert sorted(reporter.started) == [a.name for a in archives]
+    assert sorted(reporter.done) == [a.name for a in archives]
+    assert reporter.bytes == 17 + 18
+    assert all(_download.is_downloaded(a, tmp_path) for a in archives)
 
 
 def test_download_reports_failures_and_continues(tmp_path: Path) -> None:
@@ -63,11 +97,15 @@ def test_download_reports_failures_and_continues(tmp_path: Path) -> None:
     client = mock.MagicMock()
     client.download_file.side_effect = download
 
+    reporter = FakeReporter()
+
     failed = _download.download_archives(
-        client, [bad, good], tmp_path, Progress(disable=True)
+        client, [bad, good], tmp_path, reporter
     )
 
     assert failed == [bad]
+    assert reporter.failed == [bad.name]
+    assert reporter.done == [good.name]
     assert _download.is_downloaded(good, tmp_path)
 
 
@@ -98,7 +136,7 @@ def test_download_interrupt_aborts_in_flight_transfer(tmp_path: Path) -> None:
         pytest.raises(KeyboardInterrupt),
     ):
         _download.download_archives(
-            client, [archive], tmp_path, Progress(disable=True)
+            client, [archive], tmp_path, FakeReporter()
         )
 
     assert aborted.is_set()

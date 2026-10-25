@@ -3,8 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   pull_request:
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -69,21 +69,3 @@ jobs:
         with:
           name: dist
           path: dist/
-
-  publish:
-    name: Publish to PyPI
-    needs: [hooks, test, build]
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/project/dkais/
-    permissions:
-      id-token: write
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: dist
-          path: dist/
-      - uses: astral-sh/setup-uv@v7
-      - run: uv publish --trusted-publishing always

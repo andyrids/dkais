@@ -37,6 +37,10 @@ rich_tracebacks = true
 markup = false
 omit_repeated_times = false
 
+[handlers.event-handler]
+# Default below `--debug` - minimal `warning:`/`error:` lines, plain off a terminal
+class = "dkais._report.EventHandler"
+
 [handlers.stdlib-standard-handler]
 class = "logging.StreamHandler"
 formatter = "stdlib-standard-format"
