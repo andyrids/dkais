@@ -1,5 +1,8 @@
 # DK AIS [`dkais`]
 
+<!-- pyml disable-next-line line-length -->
+![PyPI - Version](https://img.shields.io/pypi/v/dkais?style=plastic) ![PyPI - Downloads](https://img.shields.io/pypi/dm/dkais?style=plastic) ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/andyrids/dkais/ci.yml?branch=main&style=plastic&logo=pytest&logoColor=%230A9EDC&label=pytest) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/andyrids/dkais/blob/main/docs/examples/my_notebook.ipynb)
+
 This Python package streamlines the download and processing of historical Automatic
 Identification System (AIS) data provided by the Danish Maritime Authority (DMA).
 
