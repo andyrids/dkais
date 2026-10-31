@@ -3,7 +3,7 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
-version: 1.1.0
+version: 1.2.0
 updated: 2026-10-31
 tags: [CLI]
 ---
@@ -48,6 +48,8 @@ Concise help holds:
 - Descriptions of flags, unless there are many
 - A pointer to `--help`
 
+Give each command its own examples too (`examples=` on `@cli.command()`), shown in its `--help`.
+
 ## (3) Documentation
 
 Help gives a quick sense of the tool, its options and its common tasks. Documentation goes into
@@ -91,6 +93,7 @@ Standard names:
 - `-a`, `--all` (`pyclig.options.select_all`)
 - `-d`, `--debug` (pyclig, on every command)
 - `-f`, `--force` (`pyclig.options.force`)
+- `-n`, `--dry-run` (`pyclig.options.dry_run`)
 - `--json` (`pyclig.options.json_output`)
 - `-h`, `--help` (pyclig)
 - `-o`, `--output`
@@ -101,6 +104,8 @@ Standard names:
 ## (7) Interactivity
 
 - Prompt only when STDIN is an interactive terminal
+- Confirm large or destructive actions with `pyclig.confirm`; `--force` skips the prompt; without
+  a terminal on STDIN, fail and name `--force`
 - Let the user escape (pyclig: Ctrl-C at a prompt)
 
 ## (8) Subcommands
