@@ -18,6 +18,9 @@ from typing import TYPE_CHECKING
 import boto3
 from botocore import UNSIGNED
 from botocore.config import Config
+from botocore.exceptions import BotoCoreError, ClientError
+
+from dkais import exceptions
 
 if TYPE_CHECKING:
     from mypy_boto3_s3 import S3Client
@@ -138,14 +141,21 @@ def list_archives(
 
     Returns:
         The matching archives, sorted by start date.
+
+    Raises:
+        exceptions.BucketError: If the bucket cannot be listed.
     """
     paginator = client.get_paginator("list_objects_v2")
-    archives = [
-        archive
-        for page in paginator.paginate(Bucket=BUCKET)
-        for obj in page.get("Contents", [])
-        if (archive := parse_key(obj["Key"], obj["Size"]))
-        and archive.overlaps(start, end)
-    ]
+    try:
+        archives = [
+            archive
+            for page in paginator.paginate(Bucket=BUCKET)
+            for obj in page.get("Contents", [])
+            if (archive := parse_key(obj["Key"], obj["Size"]))
+            and archive.overlaps(start, end)
+        ]
+    except (BotoCoreError, ClientError) as e:
+        msg = f"Cannot list bucket `{BUCKET}`: {e}"
+        raise exceptions.BucketError(msg) from e
     logger.debug("Listed %d archives in `%s`", len(archives), BUCKET)
     return sorted(archives, key=lambda a: a.start)

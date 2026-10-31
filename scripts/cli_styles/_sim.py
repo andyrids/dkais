@@ -5,8 +5,7 @@ so every style renders the same lifecycle: a header, live progress, a mid-run
 warning & failure, then a summary.
 
 NOTE: Mirrors the real output contract. Progress & logs go to `ctx.err`
-(STDERR, like `GLOBAL_CONSOLE`), the final summary to `ctx.out` (STDOUT, like
-`CLI_CONSOLE`).
+(STDERR), the final summary to `ctx.out` (STDOUT).
 
 Each style module exposes `download(ctx) -> int` & `process(ctx) -> int`,
 driving `simulate_download` / `simulate_process` with its own callbacks. Both
@@ -97,9 +96,9 @@ class DemoContext:
     """Everything a style needs to render one simulated run.
 
     Attributes:
-        err: STDERR console for progress & logs (`GLOBAL_CONSOLE`).
-        out: STDOUT console for the final summary (`CLI_CONSOLE`).
-        logger: Logger rendered like the production `rich-verbose-handler`.
+        err: STDERR console for progress & logs (`ctx.err`).
+        out: STDOUT console for the final summary (`ctx.out`).
+        logger: Logger rendered like the production `-d` handler.
         archives: Every archive in the selected range.
         downloaded: Names of archives already present (skipped).
         members: The days to process.
@@ -226,8 +225,8 @@ def save_record(ctx: DemoContext, path: Path) -> None:
 def make_logger(err: Console) -> logging.Logger:
     """Create a logger rendered like the production verbose handler.
 
-    NOTE: Matches `rich-verbose-handler` in `dkais/logging/config.toml`. A
-    style may swap the handler to demo a different log format.
+    NOTE: Matches the `RichHandler` pyclig installs for `-d`. A style may
+    swap the handler to demo a different log format.
 
     Args:
         err: The STDERR console.

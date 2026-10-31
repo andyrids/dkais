@@ -3,132 +3,140 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
-tags: [CLI, argparse]
+version: 2.0.0
+updated: 2026-10-31
+tags: [CLI]
 ---
 
 # Standard - CLI
 
-This standard is based on the [Command Line Interface Guidelines](https://clig.dev/).
+Attribution: adapted from the [Command Line Interface Guidelines](https://clig.dev/) by Aanand
+Prasad, Ben Firshman, Carl Tashian & Eva Parish, licensed
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). The guidance is condensed &
+reworded; this file is shared under the same licence.
+
+CLIs build on [`pyclig`](https://github.com/andyrids/pyclig), which implements the rules marked
+(pyclig) - they MUST NOT be reimplemented.
 
 ## (1) Basic rules
 
-These basic rules make a CLI easy to use and act as a solid foundation.
-
 ### Exit codes
 
-Return zero exit code on success and non-zero on failure. Map the non-zero exit codes to the most
-important failure modes.
+Return zero on success and non-zero on failure (pyclig): `0` ok, `1` failure, `2` usage, `70`
+internal error, `130` interrupt.
 
 ### Output
 
-Send output to STDOUT, including anything that is machine readable.
+Send the primary output, including anything machine-readable, to STDOUT (`ctx.out`).
 
 ### Messaging
 
-Send messaging to STDERR, including log messages, errors and exceptions. When commands are piped
-together, these messages are displayed to the user and not fed into the next command.
+Send messages - logs, errors, warnings, progress - to STDERR (`ctx.err`), so they reach the user
+instead of the next command in a pipe.
 
 ## (2) Help
 
-Display extensive help text when asked. Display help when passed `-h` or `--help` flags.
+Show full help for `-h` and `--help` (pyclig).
 
-Display concise help text by default. When `pkgdx` or `pkgdx subcommand` requires arguments to
-function and is run with no arguments, display concise help text.
+Show concise help when the program runs without the arguments it needs (pyclig, for a bare
+invocation). Ignore this for programs that are interactive by default (e.g. `npm init`).
 
-NOTE: You can ignore this guideline if your program is interactive by default (e.g. `npm init`).
+Concise help holds:
 
-Concise help text:
+- A description of what the program does
+- One or two example invocations (`examples=`)
+- Descriptions of flags, unless there are many
+- A pointer to `--help`
 
-- A description of what your program does.
-- One or two example invocations.
-- Descriptions of flags, unless there are lots of them.
-- An instruction to pass the `--help` flag for more information.
+Give each command its own examples too (`examples=` on `@cli.command()`), shown in its `--help`.
 
 ## (3) Documentation
 
-The purpose of help text is to give a brief, immediate sense of what your tool is, what options are
-available and how to perform the most common tasks. Documentation, on the other hand, is where you
-go into full detail.
+Help gives a quick sense of the tool, its options and its common tasks. Documentation goes into
+full detail.
 
 - Consider web-based documentation
 - Consider terminal-based documentation
 
 ## (4) Output
 
-Human-readable output is paramount. The most simple heuristic for whether a particular output
-stream (STDOUT or STDERR) is being read by a human is whether or not it is a TTY.
+Human-readable output comes first. Whether a stream is a TTY is the simplest test of whether a
+person reads it - check the stream being written, not the other one.
 
-- Have machine-readable output where it does not impact usability
-- Where human-readable output breaks machine-readable output, use `--plain`
-- Display output as formatted JSON if `--json` is passed
-- Display output on success, but keep it brief
-- When changing state, inform the user
+- Provide machine-readable output where it does not hurt usability
+- Use `--plain` where human-readable output breaks machine-readable output
+- Print formatted JSON when `--json` is passed
+- Print output on success, but keep it brief
+- Tell the user when state changes
 
 ## (5) Errors
 
-One of the most common reasons to consult documentation is to fix errors.
+Errors are a common reason to read the documentation.
 
-- Catch errors and rewrite them for humans
-- Be mindful of signal-to-noise ratio
-- Consider where the user will look first - BLUF
-- Provide provide debug and traceback information on unexpected errors
-- Make bug report submission effortless
+- Catch errors and rewrite them for humans - wrap third-party failures in the package `Error`
+- Mind the signal-to-noise ratio
+- Put the most important information where the user looks first
+- Show debug and traceback information for unexpected errors (pyclig)
+- Make bug reports effortless (pyclig: the `Issues` project URL)
+- MUST NOT parse user input as markup (pyclig)
 
 ## (6) Arguments and flags
 
-- Prefer flags to args - it makes it much clearer what is going on
-- Provide full-length versions of all flags
-- Only use one-letter flags for commonly used flags
-- Multiple arguments are fine for simple actions against multiple files
-- Use standard names for flags, if there is a standard
+- Prefer flags to arguments - they make the command clearer
+- Provide long versions of all flags
+- Use one-letter flags only for common options
+- Several arguments are fine for simple actions on several files
+- Use standard names for flags where a standard exists
 
-Common options:
+Standard names:
 
-- `-a`, `--all`
-- `-d`, `--debug`
-- `-f`, `--force`
-- `--json`
-- `-h`, -`-help`
+- `-a`, `--all` (`pyclig.options.select_all`)
+- `-d`, `--debug` (pyclig, on every command)
+- `-f`, `--force` (`pyclig.options.force`)
+- `-n`, `--dry-run` (`pyclig.options.dry_run`)
+- `--json` (`pyclig.options.json_output`)
+- `-h`, `--help` (pyclig)
 - `-o`, `--output`
 - `-q`, `--quiet`
 - `-u`, `--user`
-- `--version`
-- `-v` (often means either verbose or version)
+- `-v`, `--version` (pyclig; `-v` can also mean verbose)
 
 ## (7) Interactivity
 
-- Only use prompts or interactive elements if STDIN is an interactive terminal
-- Let the user escape
+- Prompt only when STDIN is an interactive terminal
+- Confirm large or destructive actions with `pyclig.confirm`; `--force` skips the prompt; without
+  a terminal on STDIN, fail and name `--force`
+- Let the user escape (pyclig: Ctrl-C at a prompt)
 
 ## (8) Subcommands
 
-You can reduce complexity by making a set of subcommands.
+Subcommands reduce complexity.
 
 - Be consistent across subcommands
-- Use consistent names for multiple levels of subcommand
+- Name multiple levels of subcommand consistently
 
-Either noun verb or verb noun ordering works, but noun verb seems to be more common.
+Noun-verb and verb-noun ordering both work; noun-verb is more common.
 
 ## (9) Robustness
 
 - Validate user input
-- Responsive is more important than fast
-- Show progress if something takes a long time
-- Do stuff in parallel where you can, but be thoughtful about it
+- Being responsive matters more than being fast
+- Show progress for long operations, on STDERR
+- Work in parallel where it helps, with care
 - Make things time out
-- Make it recoverable
-- Make it crash-only
+- Make operations recoverable
+- Make the program crash-only
 
 ## (10) Future-proofing
 
-Interfaces should not change without a lengthy and well-documented deprecation process.
+Interfaces change only after a long, documented deprecation.
 
 - Keep changes additive where possible
-- Warn before you make a non-additive change
-- Changing output for humans is usually OK
+- Warn before a non-additive change
+- Changing output meant for humans is usually fine
 - Avoid a catch-all subcommand
 
 ## (11) Signals and control characters
 
-- Exit on `Ctrl-C` ASAP
-- Skip long-running cleanup operations on `Ctrl-C` and inform the user
+- Exit as soon as possible on Ctrl-C (pyclig)
+- Skip long-running cleanup on Ctrl-C and tell the user

@@ -1,34 +1,26 @@
 """CLI commands to list, download & process DMA AIS archives.
 
-NOTE: The `__main__` `argparse.ArgumentParser` dkais CLI entry point uses this
-module to register subcommands (`add_subparsers`).
+NOTE: `dkais.__main__` adds these commands to the `dkais` group. polars,
+boto3, psutil & Rich progress are imported inside the commands, so `--help`,
+`-v` & usage errors never pay for them.
 """
 
-import argparse
 import calendar
 import json
 import logging
 import re
-import sys
 import time
-import zipfile
 from collections import deque
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import date
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
-import polars as pl
-import psutil
-from rich import box
+import click
+import pyclig
 from rich.filesize import decimal
-from rich.table import Table
-
-from dkais import _download, _process, _s3, exceptions
-from dkais._core import CLIContext, CLIGFormatter, ExitCode, resolve_data_dir
-from dkais._report import duration, info, plural, reporter, summarise
-from dkais.logging import GLOBAL_CONSOLE
+from rich.text import Text
 
 if TYPE_CHECKING:
     from dkais._process import Member
@@ -36,97 +28,187 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__package__)
 
+FC = TypeVar("FC", bound=Callable[..., Any])
+
 _DATE_PATTERN = re.compile(r"(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?")
 _POLL_SECONDS = 0.5
 
 
-def _parse_date(value: str, *, end: bool) -> date:
-    """Parse `YYYY`, `YYYY-MM` or `YYYY-MM-DD` into a range boundary.
+class DateBound(click.ParamType[date]):
+    """A range boundary - `YYYY`, `YYYY-MM` or `YYYY-MM-DD`.
+
+    Attributes:
+        end: Resolve a partial date to its last day, else its first.
+    """
+
+    name = "date"
+
+    def __init__(self, *, end: bool) -> None:
+        """Create the type.
+
+        Args:
+            end: Resolve a partial date to its last day, else its first.
+        """
+        self.end = end
+
+    def convert(
+        self,
+        value: Any,
+        param: click.Parameter | None,
+        ctx: click.Context | None,
+    ) -> date:
+        """Parse `YYYY`, `YYYY-MM` or `YYYY-MM-DD` into a range boundary.
+
+        Args:
+            value: The CLI argument value.
+            param: The option being parsed.
+            ctx: The command's context.
+
+        Returns:
+            The boundary date.
+        """
+        if isinstance(value, date):
+            return value
+        if not (match := _DATE_PATTERN.fullmatch(str(value))):
+            msg = f"invalid date `{value}` - use YYYY, YYYY-MM or YYYY-MM-DD"
+            self.fail(msg, param, ctx)
+        year, month, day = match.groups()
+        try:
+            y = int(year)
+            m = int(month) if month else (12 if self.end else 1)
+            last = calendar.monthrange(y, m)[1]
+            d = int(day) if day else (last if self.end else 1)
+            return date(y, m, d)
+        except ValueError as e:
+            self.fail(f"invalid date `{value}` - {e}", param, ctx)
+
+
+def _data_dir(*, required: bool) -> Callable[[FC], FC]:
+    """Add `--data-dir`, defaulting to `$DKAIS_DATA_DIR`.
 
     Args:
-        value: The CLI argument value.
-        end: Resolve a partial date to its last day, else its first.
+        required: Fail without a data directory, else pass None.
 
     Returns:
-        The boundary date.
+        The option decorator.
+    """
+    return click.option(
+        "--data-dir",
+        type=click.Path(file_okay=False, resolve_path=True, path_type=Path),
+        envvar="DKAIS_DATA_DIR",
+        show_envvar=True,
+        required=required,
+        metavar="PATH",
+        help="Data directory root",
+    )
+
+
+def _date_range(f: FC) -> FC:
+    """Add `--start` & `--end`, shared by every command."""
+    f = click.option(
+        "--end",
+        type=DateBound(end=True),
+        metavar="DATE",
+        help="Range end, inclusive (default: latest)",
+    )(f)
+    return click.option(
+        "--start",
+        type=DateBound(end=False),
+        metavar="DATE",
+        help="Range start, inclusive - YYYY, YYYY-MM or YYYY-MM-DD",
+    )(f)
+
+
+def _check_range(start: date | None, end: date | None) -> None:
+    """Check that `--start` is not after `--end`.
+
+    NOTE: An inverted range inside one month still overlaps that month's
+    archive, so it would otherwise select the whole month.
+
+    Args:
+        start: The `--start` value.
+        end: The `--end` value.
 
     Raises:
-        argparse.ArgumentTypeError: On an invalid date.
+        click.UsageError: If both are given and `start` is after `end`.
     """
-    if not (match := _DATE_PATTERN.fullmatch(value)):
-        msg = f"invalid date `{value}` - use YYYY, YYYY-MM or YYYY-MM-DD"
-        raise argparse.ArgumentTypeError(msg)
-    year, month, day = match.groups()
-    try:
-        y = int(year)
-        m = int(month) if month else (12 if end else 1)
-        d = int(day) if day else (calendar.monthrange(y, m)[1] if end else 1)
-        return date(y, m, d)
-    except ValueError as e:
-        msg = f"invalid date `{value}` - {e}"
-        raise argparse.ArgumentTypeError(msg) from e
+    if start and end and start > end:
+        msg = f"`--start` {start} is after `--end` {end}"
+        raise click.UsageError(msg)
 
 
-def _parse_start(value: str) -> date:
-    """Parse a `--start` value to the first day it covers."""
-    return _parse_date(value, end=False)
-
-
-def _parse_end(value: str) -> date:
-    """Parse an `--end` value to the last day it covers."""
-    return _parse_date(value, end=True)
-
-
-def _parse_jobs(value: str) -> int:
-    """Parse a `--jobs` value to a positive worker count."""
-    msg = f"invalid count `{value}` - use an integer >= 1"
-    try:
-        jobs = int(value)
-    except ValueError as e:
-        raise argparse.ArgumentTypeError(msg) from e
-    if jobs < 1:
-        raise argparse.ArgumentTypeError(msg)
-    return jobs
-
-
-def _requires_selection(ctx: CLIContext) -> bool:
-    """Check that `--start` or `--all` was given, else print concise help.
+def _require_selection(
+    select_all: bool, start: date | None, end: date | None
+) -> None:
+    """Check that `--start` or `--all` was given, but not both.
 
     NOTE: Guards `download` & `process` against an accidental run over the
     whole ~4.2 TB bucket.
 
     Args:
-        ctx: The CLI context.
+        select_all: Whether `--all` was given.
+        start: The `--start` value.
+        end: The `--end` value.
 
-    Returns:
-        True if a selection was given.
+    Raises:
+        click.UsageError: If the selection is missing, contradictory or
+            inverted.
     """
-    args = ctx.args
-    if args.all and (args.start or args.end):
-        logger.error("`--all` cannot be combined with `--start`/`--end`")
-        return False
-    if not (args.all or args.start):
-        args.parser.print_help(sys.stderr)
-        return False
-    return True
+    if select_all and (start or end):
+        msg = "`--all` cannot be combined with `--start`/`--end`"
+        raise click.UsageError(msg)
+    if not (select_all or start):
+        raise click.UsageError("Select archives with `--start` or `--all`")
+    _check_range(start, end)
 
 
-def command_list(ctx: CLIContext) -> int:
-    """List bucket archives, with local state when a data dir is set.
+def _tsv(value: object) -> str:
+    """Format a `list` row value for tab-separated output."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+@click.command(
+    "list",
+    cls=pyclig.Command,
+    examples=[
+        "dkais list --start 2026-10",
+        "dkais list --start 2026 | cut -f1",
+    ],
+)
+@_data_dir(required=False)
+@_date_range
+@pyclig.options.json_output(help="Output as a JSON array")
+@pyclig.pass_context
+def command_list(
+    ctx: pyclig.Context,
+    data_dir: Path | None,
+    start: date | None,
+    end: date | None,
+    json_output: bool,
+) -> int:
+    """List bucket archives & local state.
+
+    \f
+    NOTE: Off a terminal, rows are tab-separated - the `--json` keys, in
+    order, without a header - and the caption goes to STDERR.
 
     Args:
         ctx: The CLI context.
+        data_dir: The data directory, for local state.
+        start: The range start.
+        end: The range end.
+        json_output: Print a JSON array instead of a table.
 
     Returns:
-        The integer process exit code. Uses `_core.ExitCode`.
+        The integer process exit code.
     """
-    args = ctx.args
-    archives = _s3.list_archives(_s3.make_client(), args.start, args.end)
+    _check_range(start, end)
+    from dkais import _download, _s3
 
-    try:
-        data_dir: Path | None = resolve_data_dir(args.data_dir)
-    except exceptions.DataDirNotSetError:
-        data_dir = None
+    archives = _s3.list_archives(_s3.make_client(), start, end)
+    if data_dir is None:
         logger.warning(
             "No data dir - set `--data-dir` or `DKAIS_DATA_DIR` "
             "to show local state"
@@ -149,16 +231,22 @@ def command_list(ctx: CLIContext) -> int:
             )
         rows.append(row)
 
-    if args.json:
-        sys.stdout.write(json.dumps(rows, indent=2) + "\n")
-        return ExitCode.EX_OK
+    if json_output:
+        click.echo(json.dumps(rows, indent=2))
+        return pyclig.ExitCode.OK
 
     total = decimal(sum(a.size for a in archives))
-    table = Table(
-        caption=f"{len(archives)} archives, {total}",
-        box=box.SIMPLE_HEAD,
-        pad_edge=False,
-    )
+    caption = f"{len(archives)} archives, {total}"
+    if not ctx.out.is_terminal:
+        for row in rows:
+            click.echo("\t".join(_tsv(value) for value in row.values()))
+        pyclig.info(ctx.err, message=caption)
+        return pyclig.ExitCode.OK
+
+    from rich import box
+    from rich.table import Table
+
+    table = Table(caption=caption, box=box.SIMPLE_HEAD, pad_edge=False)
     table.add_column("Key", no_wrap=True)
     table.add_column("Start", no_wrap=True)
     table.add_column("End", no_wrap=True)
@@ -168,17 +256,22 @@ def command_list(ctx: CLIContext) -> int:
         table.add_column("Processed", justify="right", no_wrap=True)
 
     for archive, row in zip(archives, rows, strict=True):
-        cells = [row["key"], row["start"], row["end"], decimal(row["size"])]
+        cells: list[str | Text] = [
+            row["key"],
+            row["start"],
+            row["end"],
+            decimal(row["size"]),
+        ]
         if data_dir:
             days = (archive.end - archive.start).days + 1
             cells += [
-                "[green]✓" if row["downloaded"] else "",
+                Text("✓", style="green") if row["downloaded"] else "",
                 f"{row['processed_days']}/{days}",
             ]
         table.add_row(*cells)
 
-    ctx.console.print(table)
-    return ExitCode.EX_OK
+    ctx.out.print(table)
+    return pyclig.ExitCode.OK
 
 
 def _processed_days(archive: "Archive", parquet_dir: Path) -> int:
@@ -191,6 +284,8 @@ def _processed_days(archive: "Archive", parquet_dir: Path) -> int:
     Returns:
         The number of processed days.
     """
+    from dkais import _process
+
     days = range(archive.start.toordinal(), archive.end.toordinal() + 1)
     return sum(
         _process.day_path(parquet_dir, date.fromordinal(day)).exists()
@@ -198,46 +293,98 @@ def _processed_days(archive: "Archive", parquet_dir: Path) -> int:
     )
 
 
-def command_download(ctx: CLIContext) -> int:
-    """Download archives in range to `<data-dir>/raw`.
+@click.command(
+    "download",
+    cls=pyclig.Command,
+    no_args_is_help=True,
+    examples=[
+        "dkais download --start 2026-10 --data-dir D:/ais",
+        "dkais download --all -n",
+    ],
+)
+@_data_dir(required=True)
+@_date_range
+@pyclig.options.select_all(help="Select every archive")
+@pyclig.options.force(help="Download `--all` without confirmation")
+@click.option(
+    "-j",
+    "--jobs",
+    type=click.IntRange(min=1),
+    default=4,
+    metavar="N",
+    help="Concurrent file downloads (default: 4)",
+)
+@pyclig.options.dry_run(help="Show what would be downloaded, then stop")
+@pyclig.pass_context
+def command_download(
+    ctx: pyclig.Context,
+    data_dir: Path,
+    start: date | None,
+    end: date | None,
+    select_all: bool,
+    force: bool,
+    jobs: int,
+    dry_run: bool,
+) -> int:
+    """Download archives to <data-dir>/raw.
+
+    \f
+    NOTE: `--all` asks before downloading anything - the full bucket is
+    ~4.2 TB - unless `--force` is given; without a terminal on STDIN the run
+    exits 2. The prompt comes before the progress display, and `--dry-run`
+    stops before either.
 
     Args:
         ctx: The CLI context.
+        data_dir: The data directory.
+        start: The range start.
+        end: The range end.
+        select_all: Select every archive.
+        force: Skip the `--all` confirmation.
+        jobs: The number of concurrent file downloads.
+        dry_run: Stop after reporting what would be downloaded.
 
     Returns:
-        The integer process exit code. Uses `_core.ExitCode`.
+        The integer process exit code.
     """
-    args = ctx.args
-    if not _requires_selection(ctx):
-        return ExitCode.EX_USAGE
-    raw_dir = resolve_data_dir(args.data_dir) / "raw"
+    _require_selection(select_all, start, end)
+    from dkais import _download, _s3
+    from dkais._report import duration, plural, reporter, summarise
 
-    client = _s3.make_client(args.jobs)
-    archives = _s3.list_archives(client, args.start, args.end)
+    raw_dir = data_dir / "raw"
+    client = _s3.make_client(jobs)
+    archives = _s3.list_archives(client, start, end)
     if not archives:
         logger.warning("No archives in the selected range")
-        return ExitCode.EX_OK
+        return pyclig.ExitCode.OK
 
     pending = _download.pending_archives(archives, raw_dir)
     present = len(archives) - len(pending)
     total = sum(a.size for a in pending)
-    info(
-        GLOBAL_CONSOLE,
-        f"{plural(len(pending), 'archive')} to download · {decimal(total)} · "
-        f"{present} already present",
+    count, volume = plural(len(pending), "archive"), decimal(total)
+    pyclig.info(
+        ctx.err,
+        message=f"{count} to download · {volume} · {present} already present",
     )
+    if dry_run:
+        return pyclig.ExitCode.OK
+    if select_all and pending:
+        message = f"Download {count} ({volume})?"
+        pyclig.confirm(ctx, message=message, force=force)
     began = time.monotonic()
-    try:
-        with reporter("download", len(pending), total=total) as report:
-            failed = _download.download_archives(
-                client, pending, raw_dir, report, args.jobs
+    failed: list[Archive] = []
+    if pending:
+        try:
+            with reporter(ctx.err, "download", len(pending), total) as report:
+                failed = _download.download_archives(
+                    client, pending, raw_dir, report, jobs
+                )
+        except KeyboardInterrupt:
+            logger.warning(
+                "Interrupted - unfinished downloads discarded, "
+                "re-run to download them again"
             )
-    except KeyboardInterrupt:
-        logger.warning(
-            "Interrupted - unfinished downloads discarded, "
-            "re-run to download them again"
-        )
-        return ExitCode.EX_INTERRUPT
+            return pyclig.ExitCode.INTERRUPT
 
     elapsed = time.monotonic() - began
     size = sum(a.size for a in pending if a not in failed)
@@ -258,8 +405,10 @@ def command_download(ctx: CLIContext) -> int:
             "elapsed": f"{elapsed:.1f}s",
             "dest": raw_dir,
         },
+        out=ctx.out,
+        err=ctx.err,
     )
-    return ExitCode.EX_FAILURE if failed else ExitCode.EX_OK
+    return pyclig.ExitCode.FAILURE if failed else pyclig.ExitCode.OK
 
 
 def _extract_ahead(
@@ -283,6 +432,8 @@ def _extract_ahead(
     Yields:
         Each member & the future of its `extract_member` result.
     """
+    from dkais import _process
+
     pending: deque[tuple[Member, Future[bytes | Path]]] = deque()
     for member in members:
         in_memory = _process.fits_in_memory(member, available)
@@ -304,50 +455,88 @@ def _result(future: "Future[bytes | Path]") -> bytes | Path:
             continue
 
 
-def command_process(ctx: CLIContext) -> int:
-    """Convert downloaded archives in range to `<data-dir>/parquet`.
+@click.command(
+    "process",
+    cls=pyclig.Command,
+    no_args_is_help=True,
+    examples=[
+        "dkais process --start 2026-10 --data-dir D:/ais",
+        "dkais process --start 2026-10 --force",
+    ],
+)
+@_data_dir(required=True)
+@_date_range
+@pyclig.options.select_all(help="Select every archive")
+@pyclig.options.force(help="Re-process days that already have Parquet output")
+@pyclig.options.dry_run(help="Show what would be processed, then stop")
+@pyclig.pass_context
+def command_process(
+    ctx: pyclig.Context,
+    data_dir: Path,
+    start: date | None,
+    end: date | None,
+    select_all: bool,
+    force: bool,
+    dry_run: bool,
+) -> int:
+    """Convert archives to <data-dir>/parquet.
 
+    \f
     NOTE: Works offline - archives are discovered in `<data-dir>/raw`.
+    `--dry-run` stops before any file is written or removed.
 
     Args:
         ctx: The CLI context.
+        data_dir: The data directory.
+        start: The range start.
+        end: The range end.
+        select_all: Select every downloaded archive.
+        force: Re-process days that already have Parquet output.
+        dry_run: Stop after reporting what would be processed.
 
     Returns:
-        The integer process exit code. Uses `_core.ExitCode`.
+        The integer process exit code.
     """
-    args = ctx.args
-    if not _requires_selection(ctx):
-        return ExitCode.EX_USAGE
-    data_dir = resolve_data_dir(args.data_dir)
+    _require_selection(select_all, start, end)
+    import zipfile
+
+    import polars as pl
+    import psutil
+
+    from dkais import _process, _s3, exceptions
+    from dkais._report import duration, plural, reporter, summarise
+
     parquet_dir, tmp_dir = data_dir / "parquet", data_dir / "tmp"
 
     zip_paths = [
         path
         for path in sorted((data_dir / "raw").glob("*/*.zip"))
         if (archive := _s3.parse_key(path.name, path.stat().st_size))
-        and archive.overlaps(args.start, args.end)
+        and archive.overlaps(start, end)
     ]
     in_range = [
         member
         for path in zip_paths
-        for member in _process.list_members(path, args.start, args.end)
+        for member in _process.list_members(path, start, end)
     ]
     members = [
         member
         for member in in_range
-        if args.force or not member.target(parquet_dir).exists()
+        if force or not member.target(parquet_dir).exists()
     ]
     if not members:
         logger.warning("Nothing to process - download first or use `--force`")
-        return ExitCode.EX_OK
+        return pyclig.ExitCode.OK
     skipped = len(in_range) - len(members)
 
     csv_size = decimal(sum(member.size for member in members))
-    info(
-        GLOBAL_CONSOLE,
-        f"{plural(len(members), 'day')} to process · {csv_size} CSV · "
-        f"{skipped} already processed",
+    pyclig.info(
+        ctx.err,
+        message=f"{plural(len(members), 'day')} to process · {csv_size} CSV "
+        f"· {skipped} already processed",
     )
+    if dry_run:
+        return pyclig.ExitCode.OK
     _process.clean_stale(parquet_dir, tmp_dir)
     available = psutil.virtual_memory().available
     logger.debug(
@@ -359,7 +548,7 @@ def command_process(ctx: CLIContext) -> int:
     began = time.monotonic()
     pool = ThreadPoolExecutor(max_workers=1)
     try:
-        with reporter("process", len(members)) as report:
+        with reporter(ctx.err, "process", len(members)) as report:
             for member, extracted in _extract_ahead(
                 pool, members, tmp_dir, available
             ):
@@ -393,7 +582,7 @@ def command_process(ctx: CLIContext) -> int:
         logger.warning(
             "Interrupted - partial output discarded, re-run to resume"
         )
-        return ExitCode.EX_INTERRUPT
+        return pyclig.ExitCode.INTERRUPT
     finally:
         # Discard a prefetched CSV file left by an interrupted run
         pool.shutdown(wait=True, cancel_futures=True)
@@ -416,81 +605,7 @@ def command_process(ctx: CLIContext) -> int:
             "elapsed": f"{elapsed:.1f}s",
             "dest": parquet_dir,
         },
+        out=ctx.out,
+        err=ctx.err,
     )
-    return ExitCode.EX_FAILURE if failed else ExitCode.EX_OK
-
-
-def add_subparsers(
-    subparsers: "argparse._SubParsersAction[Any]",
-    parent: argparse.ArgumentParser | None = None,
-) -> None:
-    """Add the `list`, `download` & `process` subcommands.
-
-    Args:
-        subparsers: The main CLI parser's subparsers action.
-        parent: A parent parser to include for shared arguments.
-    """
-    common = argparse.ArgumentParser(add_help=False)
-    common.add_argument(
-        "--data-dir",
-        type=Path,
-        metavar="PATH",
-        help="Data directory root (default: $DKAIS_DATA_DIR)",
-    )
-    common.add_argument(
-        "--start",
-        type=_parse_start,
-        metavar="DATE",
-        help="Range start, inclusive - YYYY, YYYY-MM or YYYY-MM-DD",
-    )
-    common.add_argument(
-        "--end",
-        type=_parse_end,
-        metavar="DATE",
-        help="Range end, inclusive (default: latest)",
-    )
-    parents = [parent, common] if parent else [common]
-
-    commands = {
-        "list": ("List bucket archives & local state", command_list),
-        "download": ("Download archives to <data-dir>/raw", command_download),
-        "process": ("Convert archives to <data-dir>/parquet", command_process),
-    }
-    for name, (text, func) in commands.items():
-        parser = subparsers.add_parser(
-            name,
-            help=text,
-            description=text,
-            usage="USAGE:\n %(prog)s [options]",
-            add_help=False,
-            parents=parents,
-            formatter_class=CLIGFormatter,
-        )
-        parser._optionals.title = "OPTIONS"
-        parser.set_defaults(func=func, parser=parser)
-
-        if name == "list":
-            parser.add_argument(
-                "--json", action="store_true", help="Output as a JSON array"
-            )
-            continue
-
-        parser.add_argument(
-            "-a", "--all", action="store_true", help="Select every archive"
-        )
-        if name == "download":
-            parser.add_argument(
-                "-j",
-                "--jobs",
-                type=_parse_jobs,
-                default=4,
-                metavar="N",
-                help="Concurrent file downloads (default: 4)",
-            )
-        else:
-            parser.add_argument(
-                "-f",
-                "--force",
-                action="store_true",
-                help="Re-process days that already have Parquet output",
-            )
+    return pyclig.ExitCode.FAILURE if failed else pyclig.ExitCode.OK

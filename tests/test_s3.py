@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from botocore.stub import Stubber
 
-from dkais import _s3
+from dkais import _s3, exceptions
 
 
 @pytest.mark.parametrize(
@@ -90,3 +90,12 @@ def test_list_archives_filters_and_sorts() -> None:
         "2006/aisdk-2006-03.zip",
         "2024/aisdk-2024-03-01.zip",
     ]
+
+
+def test_list_archives_wraps_bucket_errors() -> None:
+    """An S3 failure becomes a `BucketError`, reported without a traceback."""
+    client = _s3.make_client()
+    with Stubber(client) as stubber:
+        stubber.add_client_error("list_objects_v2", "AccessDenied")
+        with pytest.raises(exceptions.BucketError, match="Cannot list bucket"):
+            _s3.list_archives(client)
