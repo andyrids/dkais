@@ -89,6 +89,43 @@ def test_commands_listed_in_workflow_order() -> None:
     ]
 
 
+@pytest.mark.parametrize(
+    ("command", "examples"),
+    [
+        (
+            "list",
+            [
+                "dkais list --start 2026-10",
+                "dkais list --start 2026 | cut -f1",
+            ],
+        ),
+        (
+            "download",
+            [
+                "dkais download --start 2026-10 --data-dir D:/ais",
+                "dkais download --all -n",
+            ],
+        ),
+        (
+            "process",
+            [
+                "dkais process --start 2026-10 --data-dir D:/ais",
+                "dkais process --start 2026-10 --force",
+            ],
+        ),
+    ],
+)
+def test_command_help_lists_examples(
+    command: str, examples: list[str]
+) -> None:
+    """Each command's `--help` ends with its own `EXAMPLES:` section."""
+    result = _run([command, "--help"])
+    assert result.exit_code == ExitCode.OK
+    lines = result.stdout.splitlines()
+    listed = lines[lines.index("EXAMPLES:") + 1 :]
+    assert [line.strip() for line in listed] == examples
+
+
 @pytest.mark.parametrize("command", ["download", "process"])
 def test_bare_command_prints_help_to_stderr(command: str) -> None:
     """`download`/`process` without arguments print their help to STDERR."""

@@ -28,8 +28,9 @@ dkais download --start 2026-10 --end 2026-10-07  # zips to <data-dir>/raw
 dkais process --start 2026-10 --end 2026-10-07   # to <data-dir>/parquet
 ```
 
-`list --json` emits machine-readable output, `download -j N` sets concurrent downloads (default 4)
-and `process --force` re-converts days that already have Parquet output. `download -n` and
+`dkais <command> --help` lists a command's options and examples. `list --json` emits
+machine-readable output, `download -j N` sets concurrent downloads (default 4) and
+`process --force` re-converts days that already have Parquet output. `download -n` and
 `process -n` (`--dry-run`) print what they would do to STDERR and stop, changing nothing.
 
 `list` prints a table on a terminal and, when piped, one tab-separated row per archive - the

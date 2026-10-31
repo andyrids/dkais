@@ -169,7 +169,14 @@ def _tsv(value: object) -> str:
     return str(value)
 
 
-@click.command("list", cls=pyclig.Command)
+@click.command(
+    "list",
+    cls=pyclig.Command,
+    examples=[
+        "dkais list --start 2026-10",
+        "dkais list --start 2026 | cut -f1",
+    ],
+)
 @_data_dir(required=False)
 @_date_range
 @pyclig.options.json_output(help="Output as a JSON array")
@@ -286,7 +293,15 @@ def _processed_days(archive: "Archive", parquet_dir: Path) -> int:
     )
 
 
-@click.command("download", cls=pyclig.Command, no_args_is_help=True)
+@click.command(
+    "download",
+    cls=pyclig.Command,
+    no_args_is_help=True,
+    examples=[
+        "dkais download --start 2026-10 --data-dir D:/ais",
+        "dkais download --all -n",
+    ],
+)
 @_data_dir(required=True)
 @_date_range
 @pyclig.options.select_all(help="Select every archive")
@@ -440,7 +455,15 @@ def _result(future: "Future[bytes | Path]") -> bytes | Path:
             continue
 
 
-@click.command("process", cls=pyclig.Command, no_args_is_help=True)
+@click.command(
+    "process",
+    cls=pyclig.Command,
+    no_args_is_help=True,
+    examples=[
+        "dkais process --start 2026-10 --data-dir D:/ais",
+        "dkais process --start 2026-10 --force",
+    ],
+)
 @_data_dir(required=True)
 @_date_range
 @pyclig.options.select_all(help="Select every archive")

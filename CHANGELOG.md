@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `exceptions.BucketError`: S3 listing failures print `error:` instead of a traceback.
 - `-n/--dry-run` on `download` & `process` prints what would be done, to STDERR, and stops.
 - `download -f/--force` skips the `download --all` confirmation.
+- `list`, `download` & `process` `--help` end with the command's own `EXAMPLES:`.
 
 ### Changed
 
