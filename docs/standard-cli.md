@@ -3,7 +3,7 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
-version: 1.2.0
+version: 2.0.0
 updated: 2026-10-31
 tags: [CLI]
 ---
@@ -16,7 +16,7 @@ Prasad, Ben Firshman, Carl Tashian & Eva Parish, licensed
 reworded; this file is shared under the same licence.
 
 CLIs build on [`pyclig`](https://github.com/andyrids/pyclig), which implements the rules marked
-(pyclig) - do not reimplement them.
+(pyclig) - they MUST NOT be reimplemented.
 
 ## (1) Basic rules
 
@@ -78,7 +78,7 @@ Errors are a common reason to read the documentation.
 - Put the most important information where the user looks first
 - Show debug and traceback information for unexpected errors (pyclig)
 - Make bug reports effortless (pyclig: the `Issues` project URL)
-- Never parse user input as markup (pyclig)
+- MUST NOT parse user input as markup (pyclig)
 
 ## (6) Arguments and flags
 
