@@ -22,9 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Shell completion (`_DKAIS_COMPLETE`), from click.
 - `exceptions.BucketError`: S3 listing failures print `error:` instead of a traceback.
+- `-n/--dry-run` on `download` & `process` prints what would be done, to STDERR, and stops.
+- `download -f/--force` skips the `download --all` confirmation.
+- `list`, `download` & `process` `--help` end with the command's own `EXAMPLES:`.
 
 ### Changed
 
+- **Breaking:** `download --all` asks for confirmation; without a terminal on STDIN it exits 2
+  unless `--force` is given.
 - The CLI is built on [pyclig](https://github.com/andyrids/pyclig) & click instead of argparse.
 - Exit codes: usage errors exit `2` (was `64`), unexpected errors `70` (was `2`) (#12).
 - `-v` prints `dkais <version>` (was `v<version>`); bare `dkais` prints concise help.
