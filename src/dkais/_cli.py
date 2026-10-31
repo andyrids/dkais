@@ -290,6 +290,7 @@ def _processed_days(archive: "Archive", parquet_dir: Path) -> int:
 @_data_dir(required=True)
 @_date_range
 @pyclig.options.select_all(help="Select every archive")
+@pyclig.options.force(help="Download `--all` without confirmation")
 @click.option(
     "-j",
     "--jobs",
@@ -298,6 +299,7 @@ def _processed_days(archive: "Archive", parquet_dir: Path) -> int:
     metavar="N",
     help="Concurrent file downloads (default: 4)",
 )
+@pyclig.options.dry_run(help="Show what would be downloaded, then stop")
 @pyclig.pass_context
 def command_download(
     ctx: pyclig.Context,
@@ -305,18 +307,27 @@ def command_download(
     start: date | None,
     end: date | None,
     select_all: bool,
+    force: bool,
     jobs: int,
+    dry_run: bool,
 ) -> int:
     """Download archives to <data-dir>/raw.
 
     \f
+    NOTE: `--all` asks before downloading anything - the full bucket is
+    ~4.2 TB - unless `--force` is given; without a terminal on STDIN the run
+    exits 2. The prompt comes before the progress display, and `--dry-run`
+    stops before either.
+
     Args:
         ctx: The CLI context.
         data_dir: The data directory.
         start: The range start.
         end: The range end.
         select_all: Select every archive.
+        force: Skip the `--all` confirmation.
         jobs: The number of concurrent file downloads.
+        dry_run: Stop after reporting what would be downloaded.
 
     Returns:
         The integer process exit code.
@@ -335,11 +346,16 @@ def command_download(
     pending = _download.pending_archives(archives, raw_dir)
     present = len(archives) - len(pending)
     total = sum(a.size for a in pending)
+    count, volume = plural(len(pending), "archive"), decimal(total)
     pyclig.info(
         ctx.err,
-        message=f"{plural(len(pending), 'archive')} to download · "
-        f"{decimal(total)} · {present} already present",
+        message=f"{count} to download · {volume} · {present} already present",
     )
+    if dry_run:
+        return pyclig.ExitCode.OK
+    if select_all and pending:
+        message = f"Download {count} ({volume})?"
+        pyclig.confirm(ctx, message=message, force=force)
     began = time.monotonic()
     failed: list[Archive] = []
     if pending:

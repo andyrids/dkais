@@ -220,7 +220,9 @@ def test_download_interrupt_message_unchanged(data_dir: Path) -> None:
             "dkais._download.download_archives", side_effect=KeyboardInterrupt
         ),
     ):
-        result = _run(["download", "--all", "--data-dir", str(data_dir)])
+        result = _run(
+            ["download", "--start", "2026-10", "--data-dir", str(data_dir)]
+        )
     assert result.exit_code == ExitCode.INTERRUPT
     assert result.stderr.endswith(
         "warning: Interrupted - unfinished downloads discarded, "
@@ -320,7 +322,9 @@ def test_download_summary_is_key_value(data_dir: Path) -> None:
         _mock_bucket(return_value=[archive]),
         mock.patch("dkais._download.download_archives", return_value=[]),
     ):
-        result = _run(["download", "--all", "--data-dir", str(data_dir)])
+        result = _run(
+            ["download", "--start", "2026-10", "--data-dir", str(data_dir)]
+        )
     assert result.exit_code == ExitCode.OK
     assert result.stdout.startswith(
         "downloaded=1 bytes=5 already_present=0 failed=0 elapsed="
@@ -329,7 +333,7 @@ def test_download_summary_is_key_value(data_dir: Path) -> None:
 
 
 def test_download_skips_transfer_when_nothing_pending(data_dir: Path) -> None:
-    """With every archive present, `download` shows no bar but summarises."""
+    """All present: `download --all` asks nothing, shows no bar, summarises."""
     archive = _s3.parse_key("aisdk-2026-10-18.zip", 5)
     assert archive is not None
     path = archive.local_path(data_dir / "raw")
@@ -351,6 +355,92 @@ def test_download_skips_transfer_when_nothing_pending(data_dir: Path) -> None:
     assert result.stderr == (
         "0 archives to download · 0 bytes · 1 already present\n"
     )
+
+
+_PLAN = "2 archives to download · 10 bytes · 0 already present\n"
+_PROMPT = "Download 2 archives (10 bytes)? [y/N]: "
+
+
+def _download_two(
+    data_dir: Path, *flags: str, **kwargs: Any
+) -> tuple[Result, mock.Mock]:
+    """Run `download` with two pending archives; return the transfer mock."""
+    archives = [_s3.parse_key(f"aisdk-2026-10-{d}.zip", 5) for d in (18, 19)]
+    with (
+        _mock_bucket(return_value=archives),
+        mock.patch(
+            "dkais._download.download_archives", return_value=[]
+        ) as download,
+    ):
+        argv = ["download", *flags, "--data-dir", str(data_dir)]
+        return _run(argv, **kwargs), download
+
+
+def test_download_all_without_terminal_needs_force(data_dir: Path) -> None:
+    """Off a terminal, `download --all` exits 2 naming `--force`, unasked."""
+    result, download = _download_two(data_dir, "--all")
+    download.assert_not_called()
+    assert result.exit_code == ExitCode.USAGE
+    assert result.stdout == ""
+    assert result.stderr == (
+        f"{_PLAN}error: confirmation needed, but STDIN is not a terminal - "
+        "pass `--force` to proceed\n"
+        "\n"
+        "USAGE:\n"
+        "  dkais download [options]\n"
+        "\n"
+        "Try 'dkais download --help' for more information.\n"
+    )
+
+
+def test_download_all_confirmed_on_a_terminal(data_dir: Path) -> None:
+    """On a terminal, `download --all` names the count & size; `y` proceeds."""
+    result, download = _download_two(
+        data_dir, "--all", in_tty=True, input="y\n"
+    )
+    download.assert_called_once()
+    assert result.exit_code == ExitCode.OK
+    assert result.stderr.startswith(f"{_PLAN}{_PROMPT}y\n")
+
+
+def test_download_all_declined_on_a_terminal(data_dir: Path) -> None:
+    """On a terminal, answering `n` to `download --all` aborts with exit 1."""
+    result, download = _download_two(
+        data_dir, "--all", in_tty=True, input="n\n"
+    )
+    download.assert_not_called()
+    assert result.exit_code == ExitCode.FAILURE
+    assert result.stdout == ""
+    assert result.stderr == f"{_PLAN}{_PROMPT}n\nerror: aborted\n"
+
+
+@pytest.mark.parametrize(
+    "flags",
+    [["--all", "--force"], ["--start", "2026-10"]],
+    ids=["all-force", "start"],
+)
+def test_download_without_prompt(data_dir: Path, flags: list[str]) -> None:
+    """`--all --force` & a `--start` range download without asking."""
+    result, download = _download_two(data_dir, *flags)
+    download.assert_called_once()
+    assert result.exit_code == ExitCode.OK
+    assert "[y/N]" not in result.stderr
+
+
+@pytest.mark.parametrize(
+    "flags",
+    [["--start", "2026-10", "-n"], ["--all", "--dry-run"]],
+    ids=["start", "all"],
+)
+def test_download_dry_run_stops_after_plan(
+    data_dir: Path, flags: list[str]
+) -> None:
+    """`download -n` prints only the plan, on STDERR, even before a prompt."""
+    result, download = _download_two(data_dir, *flags, in_tty=True)
+    download.assert_not_called()
+    assert result.exit_code == ExitCode.OK
+    assert result.stdout == ""
+    assert result.stderr == _PLAN
 
 
 def test_download_inverted_range_skips_monthly_archive(data_dir: Path) -> None:
