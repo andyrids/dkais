@@ -341,17 +341,19 @@ def command_download(
         f"{decimal(total)} · {present} already present",
     )
     began = time.monotonic()
-    try:
-        with reporter(ctx.err, "download", len(pending), total) as report:
-            failed = _download.download_archives(
-                client, pending, raw_dir, report, jobs
+    failed: list[Archive] = []
+    if pending:
+        try:
+            with reporter(ctx.err, "download", len(pending), total) as report:
+                failed = _download.download_archives(
+                    client, pending, raw_dir, report, jobs
+                )
+        except KeyboardInterrupt:
+            logger.warning(
+                "Interrupted - unfinished downloads discarded, "
+                "re-run to download them again"
             )
-    except KeyboardInterrupt:
-        logger.warning(
-            "Interrupted - unfinished downloads discarded, "
-            "re-run to download them again"
-        )
-        return pyclig.ExitCode.INTERRUPT
+            return pyclig.ExitCode.INTERRUPT
 
     elapsed = time.monotonic() - began
     size = sum(a.size for a in pending if a not in failed)

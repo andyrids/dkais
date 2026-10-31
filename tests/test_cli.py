@@ -328,6 +328,31 @@ def test_download_summary_is_key_value(data_dir: Path) -> None:
     assert result.stderr.startswith("1 archive to download · 5 bytes")
 
 
+def test_download_skips_transfer_when_nothing_pending(data_dir: Path) -> None:
+    """With every archive present, `download` shows no bar but summarises."""
+    archive = _s3.parse_key("aisdk-2026-10-18.zip", 5)
+    assert archive is not None
+    path = archive.local_path(data_dir / "raw")
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"12345")
+    argv = ["download", "--all", "--data-dir", str(data_dir)]
+    with (
+        _mock_bucket(return_value=[archive]),
+        mock.patch(
+            "dkais._download.download_archives", return_value=[]
+        ) as download,
+    ):
+        result = _run(argv, err_tty=True, interactive=True)
+    download.assert_not_called()
+    assert result.exit_code == ExitCode.OK
+    assert result.stdout.startswith(
+        "downloaded=0 bytes=0 already_present=1 failed=0 elapsed="
+    )
+    assert result.stderr == (
+        "0 archives to download · 0 bytes · 1 already present\n"
+    )
+
+
 def test_download_inverted_range_skips_monthly_archive(data_dir: Path) -> None:
     """A same-month inverted range no longer downloads the whole month."""
     client = _s3.make_client()
