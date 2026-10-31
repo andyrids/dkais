@@ -88,3 +88,4 @@ explicit = true
 
 [tool.uv.sources]
 pkgdx = { index = "gitlab" }
+pyclig = { path = "../pyclig", editable = true }

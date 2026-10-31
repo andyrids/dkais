@@ -497,7 +497,7 @@ requires-dist = [
     { name = "click", specifier = "~=8.5" },
     { name = "polars", specifier = ">=2.0.0" },
     { name = "psutil", specifier = ">=7.2.2" },
-    { name = "pyclig", specifier = "~=0.1" },
+    { name = "pyclig", editable = "../pyclig" },
     { name = "rich" },
     { name = "zlib-ng", marker = "python_full_version < '3.14' or sys_platform != 'win32'", specifier = ">=1.0.0" },
 ]
@@ -896,15 +896,26 @@ wheels = [
 
 [[package]]
 name = "pyclig"
-version = "0.1.0"
-source = { registry = "https://pypi.org/simple" }
+source = { editable = "../pyclig" }
 dependencies = [
     { name = "click" },
     { name = "rich" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/31/18/4503466fcb5e3e05e864818a333ada562f28ee7cc181a6d9f164bbf8e233/pyclig-0.1.0.tar.gz", hash = "sha256:151bfa24e75ed7e35b7407765f62554976eb089e06946c30f99464ba155f85e0", size = 21921, upload-time = "2026-10-31T21:40:34.173Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a0/8c/19320b0e7bbdfecb350e708a6b6c86e1b7f9ba04ba4e4477f73af914159b/pyclig-0.1.0-py3-none-any.whl", hash = "sha256:30b55a5b701161636b46696286b7563ad171d1569cd6f23488d0d4345e859b16", size = 25631, upload-time = "2026-10-31T21:40:33.085Z" },
+
+[package.metadata]
+requires-dist = [
+    { name = "click", specifier = "~=8.5" },
+    { name = "rich", specifier = "~=15.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "coverage", specifier = "~=7.17" },
+    { name = "mypy", specifier = "~=2.4" },
+    { name = "prek", specifier = "~=0.5" },
+    { name = "pymarkdownlnt", specifier = "~=0.9" },
+    { name = "pytest", specifier = "~=9.0" },
+    { name = "ruff", specifier = "~=0.17" },
 ]
 
 [[package]]
