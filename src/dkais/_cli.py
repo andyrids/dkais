@@ -445,6 +445,7 @@ def _result(future: "Future[bytes | Path]") -> bytes | Path:
 @_date_range
 @pyclig.options.select_all(help="Select every archive")
 @pyclig.options.force(help="Re-process days that already have Parquet output")
+@pyclig.options.dry_run(help="Show what would be processed, then stop")
 @pyclig.pass_context
 def command_process(
     ctx: pyclig.Context,
@@ -453,11 +454,13 @@ def command_process(
     end: date | None,
     select_all: bool,
     force: bool,
+    dry_run: bool,
 ) -> int:
     """Convert archives to <data-dir>/parquet.
 
     \f
     NOTE: Works offline - archives are discovered in `<data-dir>/raw`.
+    `--dry-run` stops before any file is written or removed.
 
     Args:
         ctx: The CLI context.
@@ -466,6 +469,7 @@ def command_process(
         end: The range end.
         select_all: Select every downloaded archive.
         force: Re-process days that already have Parquet output.
+        dry_run: Stop after reporting what would be processed.
 
     Returns:
         The integer process exit code.
@@ -508,6 +512,8 @@ def command_process(
         message=f"{plural(len(members), 'day')} to process · {csv_size} CSV "
         f"· {skipped} already processed",
     )
+    if dry_run:
+        return pyclig.ExitCode.OK
     _process.clean_stale(parquet_dir, tmp_dir)
     available = psutil.virtual_memory().available
     logger.debug(

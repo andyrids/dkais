@@ -18,6 +18,7 @@ from botocore.stub import Stubber
 from click.testing import Result
 from pyclig import ExitCode
 from pyclig.testing import invoke
+from rich.filesize import decimal
 
 from dkais import _cli, _s3, exceptions
 from dkais.__main__ import cli
@@ -293,6 +294,31 @@ def test_process_extracts_ahead(
     written = sorted(p.name for p in (data_dir / "parquet").rglob("*.*"))
     assert written == [f"aisdk-2006-03-0{d}.parquet" for d in (1, 2, 3)]
     assert not list(data_dir.glob("tmp/*"))
+
+
+def test_process_dry_run_writes_nothing(
+    data_dir: Path, samples: Samples, write_zip: ZipWriter
+) -> None:
+    """`process -n` prints the plan on STDERR, writing & removing nothing."""
+    name, text = samples["comma-22"]
+    write_zip(data_dir / "raw/2006/aisdk-2006-03.zip", {name: text})
+    stale = [
+        data_dir / "tmp/aisdk_20060302.csv",
+        data_dir / "parquet/YEAR=2006/MONTH=3/aisdk-2006-03-02.parquet.tmp",
+    ]
+    for path in stale:
+        path.parent.mkdir(parents=True)
+        path.touch()
+
+    argv = ["process", "--start", "2006-03", "-n", "--data-dir", str(data_dir)]
+    result = _run(argv)
+    assert result.exit_code == ExitCode.OK
+    assert result.stdout == ""
+    assert result.stderr == (
+        f"1 day to process · {decimal(len(text))} CSV · 0 already processed\n"
+    )
+    assert not list(data_dir.rglob("*.parquet"))
+    assert all(path.exists() for path in stale)
 
 
 def test_process_reports_failed_days(

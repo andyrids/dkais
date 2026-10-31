@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Shell completion (`_DKAIS_COMPLETE`), from click.
 - `exceptions.BucketError`: S3 listing failures print `error:` instead of a traceback.
-- `download -n/--dry-run` prints what would be downloaded, to STDERR, and stops.
+- `-n/--dry-run` on `download` & `process` prints what would be done, to STDERR, and stops.
 - `download -f/--force` skips the `download --all` confirmation.
 
 ### Changed

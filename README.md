@@ -29,8 +29,8 @@ dkais process --start 2026-10 --end 2026-10-07   # to <data-dir>/parquet
 ```
 
 `list --json` emits machine-readable output, `download -j N` sets concurrent downloads (default 4)
-and `process --force` re-converts days that already have Parquet output. `download -n`
-(`--dry-run`) prints what it would download to STDERR and stops.
+and `process --force` re-converts days that already have Parquet output. `download -n` and
+`process -n` (`--dry-run`) print what they would do to STDERR and stop, changing nothing.
 
 `list` prints a table on a terminal and, when piped, one tab-separated row per archive - the
 `--json` keys in order, without a header. Add `-d` before or after any command for debug logging.
