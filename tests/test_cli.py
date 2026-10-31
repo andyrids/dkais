@@ -1,35 +1,41 @@
 """Unit tests for the `dkais` CLI (`dkais.__main__`, `dkais._cli`)."""
 
-import argparse
+import importlib.util
 import json
+import logging
+import os
+import subprocess
+import sys
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
+import click
 import pytest
+from click.testing import Result
+from pyclig import ExitCode
+from pyclig.testing import invoke
 
-from dkais import __main__, _cli, _s3, exceptions
-from dkais._core import ExitCode, resolve_data_dir
-
-CLI = "dkais._cli"
+from dkais import _cli, _s3, exceptions
+from dkais.__main__ import cli
 
 Samples = dict[str, tuple[str, str]]
 ZipWriter = Callable[[Path, dict[str, str]], Path]
 
 
-def _run_main(argv: list[str]) -> int:
-    """Run `dkais.__main__.main` with `argv` & return the exit code."""
-    with (
-        mock.patch("sys.argv", ["dkais", *argv]),
-        mock.patch("dkais.__main__.configure_cli_logging"),
-        pytest.raises(SystemExit) as exc_info,
-    ):
-        __main__.main()
+def _run(argv: list[str], **kwargs: Any) -> Result:
+    """Run the CLI in-process, isolated from the shell's `DKAIS_DATA_DIR`."""
+    env = {"DKAIS_DATA_DIR": None, **kwargs.pop("env", {})}
+    return invoke(cli, argv, env=env, **kwargs)
 
-    code = exc_info.value.code
-    assert isinstance(code, int)
-    return code
+
+def _subprocess_env(**env: str) -> dict[str, str]:
+    """Return a clean environment for a `python -m dkais` subprocess."""
+    cleared = ("DKAIS_DATA_DIR", "FORCE_COLOR", "NO_COLOR", "TTY_COMPATIBLE")
+    base = {k: v for k, v in os.environ.items() if k not in cleared}
+    return base | env
 
 
 @pytest.mark.parametrize(
@@ -42,94 +48,185 @@ def _run_main(argv: list[str]) -> int:
 )
 def test_parse_dates(value: str, start: date, end: date) -> None:
     """Partial dates widen to the first or last day they cover."""
-    assert _cli._parse_start(value) == start
-    assert _cli._parse_end(value) == end
+    assert _cli.DateBound(end=False).convert(value, None, None) == start
+    assert _cli.DateBound(end=True).convert(value, None, None) == end
 
 
 @pytest.mark.parametrize("value", ["26", "2026-13", "2026-02-30", "2026/10"])
 def test_parse_dates_rejects_invalid(value: str) -> None:
-    """Malformed or impossible dates are argparse type errors."""
-    with pytest.raises(argparse.ArgumentTypeError):
-        _cli._parse_start(value)
-
-
-def test_parse_jobs() -> None:
-    """A positive integer is a valid worker count."""
-    assert _cli._parse_jobs("1") == 1
+    """Malformed or impossible dates are click parameter errors."""
+    with pytest.raises(click.BadParameter, match="invalid date"):
+        _cli.DateBound(end=False).convert(value, None, None)
 
 
 @pytest.mark.parametrize("value", ["0", "-1", "x"])
-def test_parse_jobs_rejects_invalid(value: str) -> None:
-    """Non-positive or non-integer counts are argparse type errors."""
-    with pytest.raises(argparse.ArgumentTypeError):
-        _cli._parse_jobs(value)
+def test_invalid_jobs_is_a_usage_error(data_dir: Path, value: str) -> None:
+    """An invalid `--jobs` fails at parse time with the usage exit code."""
+    argv = ["download", "--all", "--jobs", value, "--data-dir", str(data_dir)]
+    result = _run(argv)
+    assert result.exit_code == ExitCode.USAGE
+    assert "'-j' / '--jobs'" in result.stderr
 
 
-def test_main_maps_invalid_jobs_to_usage() -> None:
-    """An invalid `--jobs` fails at parse time with a usage exit code."""
-    assert _run_main(["download", "--all", "--jobs", "0"]) == ExitCode.EX_USAGE
+def test_main_without_command_shows_concise_help() -> None:
+    """`dkais` prints a header & concise help to STDOUT, exiting 0."""
+    result = _run([])
+    assert result.exit_code == ExitCode.OK
+    assert result.stdout.startswith("DMA AIS data manager [dkais ")
+    assert "COMMANDS:" in result.stdout
 
 
-def test_resolve_data_dir_env_fallback(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The flag wins, then `DKAIS_DATA_DIR`, else an error."""
-    monkeypatch.setenv("DKAIS_DATA_DIR", str(tmp_path / "env"))
-    assert resolve_data_dir(tmp_path / "flag") == tmp_path / "flag"
-    assert resolve_data_dir(None) == tmp_path / "env"
-
-    monkeypatch.delenv("DKAIS_DATA_DIR")
-    with pytest.raises(exceptions.DataDirNotSetError):
-        resolve_data_dir(None)
+def test_commands_listed_in_workflow_order() -> None:
+    """`COMMANDS:` lists `list`, `download` & `process` in that order."""
+    lines = _run(["--help"]).stdout.splitlines()
+    start = lines.index("COMMANDS:") + 1
+    assert [line.split()[0] for line in lines[start : start + 3]] == [
+        "list",
+        "download",
+        "process",
+    ]
 
 
-def test_main_without_command_shows_help(
-    capsys: pytest.CaptureFixture,
-) -> None:
-    """`dkais` prints a header & help, exiting 0."""
-    assert _run_main([]) == ExitCode.EX_OK
-    assert "COMMANDS" in capsys.readouterr().out
+@pytest.mark.parametrize("command", ["download", "process"])
+def test_bare_command_prints_help_to_stderr(command: str) -> None:
+    """`download`/`process` without arguments print their help to STDERR."""
+    result = _run([command])
+    assert result.exit_code == ExitCode.USAGE
+    assert result.stdout == ""
+    assert result.stderr.startswith(f"USAGE:\n  dkais {command} [options]")
 
 
 @pytest.mark.parametrize(
-    "argv",
+    ("argv", "message"),
     [
-        ["download"],
-        ["process"],
-        ["download", "--all", "--start", "2026"],
+        (["download"], "Select archives with `--start` or `--all`"),
+        (["process", "--end", "2026"], "Select archives with `--start`"),
+        (
+            ["download", "--all", "--start", "2026"],
+            "`--all` cannot be combined with `--start`/`--end`",
+        ),
     ],
 )
-def test_main_requires_selection(data_dir: Path, argv: list[str]) -> None:
+def test_main_requires_selection(
+    data_dir: Path, argv: list[str], message: str
+) -> None:
     """`download`/`process` need `--start` or `--all`, not both."""
-    assert _run_main([*argv, "--data-dir", str(data_dir)]) == ExitCode.EX_USAGE
+    result = _run([*argv, "--data-dir", str(data_dir)])
+    assert result.exit_code == ExitCode.USAGE
+    assert result.stderr.startswith(f"error: {message}")
 
 
-def test_main_maps_missing_data_dir_to_usage(data_dir: Path) -> None:
-    """No `--data-dir` & no `DKAIS_DATA_DIR` is a usage error."""
-    assert _run_main(["process", "--all"]) == ExitCode.EX_USAGE
+def test_missing_data_dir_names_env_var(data_dir: Path) -> None:
+    """No `--data-dir` & no `DKAIS_DATA_DIR` is a usage error naming both."""
+    result = _run(["process", "--all"])
+    assert result.exit_code == ExitCode.USAGE
+    assert (
+        "error: Missing option '--data-dir' (env var: 'DKAIS_DATA_DIR')."
+        in result.stderr
+    )
 
 
-def test_main_maps_error_to_exit_1(data_dir: Path) -> None:
-    """An `Error` maps to exit code 1."""
-    error = exceptions.CSVDialectError("bad")
-    with mock.patch(f"{CLI}.command_process", side_effect=error):
-        assert _run_main(["process", "--all"]) == ExitCode.EX_FAILURE
+def test_data_dir_from_env(data_dir: Path) -> None:
+    """`DKAIS_DATA_DIR` supplies the data directory."""
+    result = _run(["process", "--all"], env={"DKAIS_DATA_DIR": str(data_dir)})
+    assert result.exit_code == ExitCode.OK
+    assert "Nothing to process" in result.stderr
 
 
-def test_download_interrupt_exits_130(data_dir: Path) -> None:
-    """Ctrl-C during downloads exits with `EX_INTERRUPT`."""
+def _mock_bucket(**kwargs: Any) -> Any:
+    """Patch the S3 client & listing; `kwargs` configure `list_archives`."""
+    return mock.patch.multiple(
+        _s3, make_client=mock.DEFAULT, list_archives=mock.Mock(**kwargs)
+    )
+
+
+def test_usage_error_only_on_stderr() -> None:
+    """A usage error writes nothing to STDOUT & its message to STDERR (#7)."""
+    result = _run(["list", "--start", "nope"])
+    assert result.exit_code == ExitCode.USAGE
+    assert result.stdout == ""
+    message = (
+        "error: Invalid value for '--start': invalid date `nope` - use YYYY, "
+        "YYYY-MM or YYYY-MM-DD"
+    )
+    assert result.stderr.splitlines() == [
+        message,
+        "",
+        "USAGE:",
+        "  dkais list [options]",
+        "",
+        "Try 'dkais list --help' for more information.",
+    ]
+
+
+@pytest.mark.parametrize("value", ["[/b]", "[red]x", ":warning:"])
+def test_usage_error_prints_input_literally(value: str) -> None:
+    """Markup in a bad value prints as typed, with no traceback (#7)."""
+    result = _run(["list", "--start", value])
+    assert result.exit_code == ExitCode.USAGE
+    assert f"invalid date `{value}`" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def _logging_listing(*args: object) -> list[_s3.Archive]:
+    """Stand in for `list_archives`, logging a debug record."""
+    logging.getLogger("dkais._s3").debug("bucket-listed")
+    return []
+
+
+@pytest.mark.parametrize(
+    ("argv", "debug"),
+    [(["-d", "list"], True), (["list", "-d"], True), (["list"], False)],
+)
+def test_debug_before_or_after_command(argv: list[str], debug: bool) -> None:
+    """`-d` enables debug logging before or after the command name (#8)."""
+    with _mock_bucket(side_effect=_logging_listing):
+        result = _run(argv)
+    assert result.exit_code == ExitCode.OK
+    assert ("bucket-listed" in result.stderr) is debug
+
+
+def test_list_interrupt_exits_130() -> None:
+    """Ctrl-C during `list` prints one line to STDERR & exits 130 (#9)."""
+    with _mock_bucket(side_effect=KeyboardInterrupt):
+        result = _run(["list"])
+    assert result.exit_code == ExitCode.INTERRUPT
+    assert result.stderr == "warning: interrupted\n"
+
+
+def test_download_interrupt_message_unchanged(data_dir: Path) -> None:
+    """Ctrl-C during downloads keeps its tailored message & exits 130."""
     archive = _s3.parse_key("aisdk-2026-10-18.zip", 1)
     with (
-        mock.patch(f"{CLI}._s3.make_client"),
-        mock.patch(f"{CLI}._s3.list_archives", return_value=[archive]),
+        _mock_bucket(return_value=[archive]),
         mock.patch(
-            f"{CLI}._download.download_archives", side_effect=KeyboardInterrupt
+            "dkais._download.download_archives", side_effect=KeyboardInterrupt
         ),
     ):
-        exit_code = _run_main(
-            ["download", "--all", "--data-dir", str(data_dir)]
-        )
-    assert exit_code == ExitCode.EX_INTERRUPT
+        result = _run(["download", "--all", "--data-dir", str(data_dir)])
+    assert result.exit_code == ExitCode.INTERRUPT
+    assert result.stderr.endswith(
+        "warning: Interrupted - unfinished downloads discarded, "
+        "re-run to download them again\n"
+    )
+
+
+def test_bucket_error_is_reported_without_traceback() -> None:
+    """An expected `Error` prints `error: message` & exits 1."""
+    error = exceptions.BucketError("Cannot list bucket `x`: offline")
+    with _mock_bucket(side_effect=error):
+        result = _run(["list"])
+    assert result.exit_code == ExitCode.FAILURE
+    assert result.stderr == "error: Cannot list bucket `x`: offline\n"
+
+
+def test_crash_exits_70_with_bug_hint() -> None:
+    """An unexpected exception exits 70 with a bug report hint (#12)."""
+    with _mock_bucket(side_effect=RuntimeError("boom")):
+        result = _run(["list"])
+    assert result.exit_code == ExitCode.INTERNAL
+    assert "error: unexpected RuntimeError: boom" in result.stderr
+    assert "https://github.com/andyrids/dkais/issues" in result.stderr
 
 
 def test_process_converts_selected_days(
@@ -145,16 +242,16 @@ def test_process_converts_selected_days(
     argv += ["--data-dir", str(data_dir)]
     target = data_dir / "parquet/YEAR=2006/MONTH=3/aisdk-2006-03-02.parquet"
 
-    assert _run_main(argv) == ExitCode.EX_OK
+    assert _run(argv).exit_code == ExitCode.OK
     assert [p.name for p in (data_dir / "parquet").rglob("*.parquet")] == [
         target.name
     ]
 
     mtime = target.stat().st_mtime_ns
-    assert _run_main(argv) == ExitCode.EX_OK
+    assert _run(argv).exit_code == ExitCode.OK
     assert target.stat().st_mtime_ns == mtime
 
-    assert _run_main([*argv, "--force"]) == ExitCode.EX_OK
+    assert _run([*argv, "--force"]).exit_code == ExitCode.OK
     assert target.stat().st_mtime_ns != mtime
 
 
@@ -171,8 +268,8 @@ def test_process_extracts_ahead(
     argv = ["process", "--all", "--data-dir", str(data_dir)]
 
     memory = mock.Mock(available=available)
-    with mock.patch(f"{CLI}.psutil.virtual_memory", return_value=memory):
-        assert _run_main(argv) == ExitCode.EX_OK
+    with mock.patch("psutil.virtual_memory", return_value=memory):
+        assert _run(argv).exit_code == ExitCode.OK
 
     written = sorted(p.name for p in (data_dir / "parquet").rglob("*.*"))
     assert written == [f"aisdk-2006-03-0{d}.parquet" for d in (1, 2, 3)]
@@ -180,46 +277,43 @@ def test_process_extracts_ahead(
 
 
 def test_process_reports_failed_days(
-    data_dir: Path, write_zip: ZipWriter, capsys: pytest.CaptureFixture
+    data_dir: Path, write_zip: ZipWriter
 ) -> None:
-    """A day with an unknown dialect fails the run with exit code 1."""
+    """A failed day is reported on STDERR & summarised on STDOUT (#15)."""
     write_zip(
         data_dir / "raw/2026/aisdk-2026-10-18.zip",
         {"aisdk-2026-10-18.csv": "a;b"},
     )
-    argv = ["process", "--all", "--data-dir", str(data_dir)]
-    assert _run_main(argv) == ExitCode.EX_FAILURE
+    result = _run(["process", "--all", "--data-dir", str(data_dir)])
+    assert result.exit_code == ExitCode.FAILURE
 
     # Not a terminal, so plain lines - no traceback for an expected failure
-    captured = capsys.readouterr()
-    output = captured.out + captured.err
-    assert "[1/1] aisdk-2026-10-18.csv  FAILED: " in output
-    assert "error: 1 of 1 day failed, re-run to retry" in output
-    assert "Traceback" not in output
-    assert "processed=0 already_processed=0 failed=1 " in captured.out
-
-
-def test_download_summary_is_key_value(
-    data_dir: Path, capsys: pytest.CaptureFixture
-) -> None:
-    """Off a terminal, the download summary is one `key=value` line."""
-    archive = _s3.parse_key("aisdk-2026-10-18.zip", 5)
-    with (
-        mock.patch(f"{CLI}._s3.make_client"),
-        mock.patch(f"{CLI}._s3.list_archives", return_value=[archive]),
-        mock.patch(f"{CLI}._download.download_archives", return_value=[]),
-    ):
-        exit_code = _run_main(
-            ["download", "--all", "--data-dir", str(data_dir)]
-        )
-    assert exit_code == ExitCode.EX_OK
-    summary = capsys.readouterr().out.splitlines()[-1]
-    assert summary.startswith(
-        "downloaded=1 bytes=5 already_present=0 failed=0 elapsed="
+    assert "[1/1] aisdk-2026-10-18.csv  FAILED: " in result.stderr
+    assert "error: 1 of 1 day failed, re-run to retry" in result.stderr
+    assert "Traceback" not in result.output
+    assert result.stdout.startswith(
+        "processed=0 already_processed=0 failed=1 "
     )
 
 
-def _list_one_processed_day(data_dir: Path, *flags: str) -> int:
+def test_download_summary_is_key_value(data_dir: Path) -> None:
+    """Off a terminal, the download summary is one `key=value` line (#15)."""
+    archive = _s3.parse_key("aisdk-2026-10-18.zip", 5)
+    with (
+        _mock_bucket(return_value=[archive]),
+        mock.patch("dkais._download.download_archives", return_value=[]),
+    ):
+        result = _run(["download", "--all", "--data-dir", str(data_dir)])
+    assert result.exit_code == ExitCode.OK
+    assert result.stdout.startswith(
+        "downloaded=1 bytes=5 already_present=0 failed=0 elapsed="
+    )
+    assert result.stderr.startswith("1 archive to download · 5 bytes")
+
+
+def _list_one_processed_day(
+    data_dir: Path, *flags: str, **kwargs: Any
+) -> Result:
     """Run `list` over a downloaded March 2006 archive with 1 day processed."""
     archive = _s3.parse_key("2006/aisdk-2006-03.zip", 3)
     assert archive is not None
@@ -230,45 +324,51 @@ def _list_one_processed_day(data_dir: Path, *flags: str) -> int:
     day.parent.mkdir(parents=True)
     day.touch()
 
-    with (
-        mock.patch(f"{CLI}._s3.make_client"),
-        mock.patch(f"{CLI}._s3.list_archives", return_value=[archive]),
-    ):
-        return _run_main(["list", *flags, "--data-dir", str(data_dir)])
+    with _mock_bucket(return_value=[archive]):
+        return _run(["list", *flags, "--data-dir", str(data_dir)], **kwargs)
 
 
-def test_list_table_shows_processed_of_period(
-    data_dir: Path, capsys: pytest.CaptureFixture
-) -> None:
-    """`list` shows processed days out of the days the archive covers."""
-    assert _list_one_processed_day(data_dir) == ExitCode.EX_OK
-    header, *rows = capsys.readouterr().out.strip().splitlines()
+def test_list_table_on_a_terminal(data_dir: Path) -> None:
+    """On a terminal, `list` shows a table of processed days per period."""
+    result = _list_one_processed_day(data_dir, out_tty=True, width=120)
+    assert result.exit_code == ExitCode.OK
+    header, _, row, *_ = result.stdout.strip().splitlines()
     assert header.split()[-1] == "Processed"
-    assert rows[1].split()[-1] == "1/31"
+    assert row.split()[-1] == "1/31"
 
 
-def test_list_warns_without_data_dir(
-    data_dir: Path,
-    capsys: pytest.CaptureFixture,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """Without a data dir, `list` omits local state & says why."""
+def test_list_rows_when_piped(data_dir: Path) -> None:
+    """Off a terminal, `list` prints tab-separated rows, caption on STDERR."""
+    result = _list_one_processed_day(data_dir)
+    assert result.exit_code == ExitCode.OK
+    assert result.stdout == (
+        "2006/aisdk-2006-03.zip\t2006-03-01\t2006-03-31\t3\ttrue\t1\n"
+    )
+    assert result.stderr == "1 archives, 3 bytes\n"
+
+
+def test_list_rows_empty_when_nothing_listed() -> None:
+    """An empty listing prints nothing to STDOUT."""
+    with _mock_bucket(return_value=[]):
+        result = _run(["list"])
+    assert result.stdout == ""
+
+
+def test_list_warns_without_data_dir() -> None:
+    """Without a data dir, `list` omits local state & says why on STDERR."""
     archive = _s3.parse_key("2006/aisdk-2006-03.zip", 3)
-    with (
-        mock.patch(f"{CLI}._s3.make_client"),
-        mock.patch(f"{CLI}._s3.list_archives", return_value=[archive]),
-    ):
-        assert _run_main(["list"]) == ExitCode.EX_OK
-    assert "Processed" not in capsys.readouterr().out
-    assert "DKAIS_DATA_DIR" in caplog.text
+    with _mock_bucket(return_value=[archive]):
+        result = _run(["list"])
+    assert result.exit_code == ExitCode.OK
+    assert result.stdout.count("\t") == 3
+    assert result.stderr.startswith("warning: No data dir - set `--data-dir`")
 
 
-def test_list_json_includes_local_state(
-    data_dir: Path, capsys: pytest.CaptureFixture
-) -> None:
+def test_list_json_includes_local_state(data_dir: Path) -> None:
     """`list --json` reports download & processed state per archive."""
-    assert _list_one_processed_day(data_dir, "--json") == ExitCode.EX_OK
-    assert json.loads(capsys.readouterr().out) == [
+    result = _list_one_processed_day(data_dir, "--json")
+    assert result.exit_code == ExitCode.OK
+    assert json.loads(result.stdout) == [
         {
             "key": "2006/aisdk-2006-03.zip",
             "start": "2006-03-01",
@@ -278,3 +378,91 @@ def test_list_json_includes_local_state(
             "processed_days": 1,
         }
     ]
+
+
+def _process_one_day(
+    data_dir: Path, samples: Samples, write_zip: ZipWriter, **env: str
+) -> str:
+    """Run `python -m dkais process` over one sample day; return STDOUT."""
+    name, text = samples["comma-22"]
+    write_zip(data_dir / "raw/2006/aisdk-2006-03.zip", {name: text})
+    result = subprocess.run(
+        [sys.executable, "-m", "dkais", "process", "--all"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env=_subprocess_env(DKAIS_DATA_DIR=str(data_dir), **env),
+        check=True,
+    )
+    return result.stdout
+
+
+def test_forced_colour_styles_piped_summary(
+    data_dir: Path, samples: Samples, write_zip: ZipWriter
+) -> None:
+    """`FORCE_COLOR=1` renders the piped summary as on a terminal (#10)."""
+    stdout = _process_one_day(data_dir, samples, write_zip, FORCE_COLOR="1")
+    assert "\x1b[" in stdout
+    assert "Processed 1 day" in stdout
+
+
+def test_piped_summary_plain_by_default(
+    data_dir: Path, samples: Samples, write_zip: ZipWriter
+) -> None:
+    """Without `FORCE_COLOR`, the piped summary stays a `key=value` line."""
+    stdout = _process_one_day(data_dir, samples, write_zip)
+    assert stdout.startswith("processed=1 already_processed=0 failed=0 ")
+
+
+_HEAVY = """
+import sys
+from dkais.__main__ import cli
+try:
+    cli(sys.argv[1:])
+except SystemExit:
+    pass
+heavy = ("polars", "boto3", "botocore", "s3transfer", "psutil", "zlib_ng",
+         "pygments", "rich.progress", "rich.traceback")
+loaded = sorted(m for m in sys.modules if m.startswith(heavy))
+print(loaded, file=sys.__stderr__)
+"""
+
+
+@pytest.mark.parametrize(
+    ("argv", "env"),
+    [
+        (["--help"], {}),
+        (["-v"], {}),
+        ([], {}),
+        (["list", "--start", "nope"], {}),
+        (
+            [],
+            {
+                "_DKAIS_COMPLETE": "bash_complete",
+                "COMP_WORDS": "dkais l",
+                "COMP_CWORD": "1",
+            },
+        ),
+    ],
+    ids=["help", "version", "bare", "usage-error", "completion"],
+)
+def test_fast_paths_skip_heavy_imports(
+    argv: list[str], env: dict[str, str]
+) -> None:
+    """Assert the fast paths import no heavy module (#13)."""
+    result = subprocess.run(
+        [sys.executable, "-c", _HEAVY, *argv],
+        capture_output=True,
+        text=True,
+        env=_subprocess_env(**env),
+        check=True,
+    )
+    assert result.stderr.splitlines()[-1] == "[]"
+
+
+def test_import_installs_only_a_null_handler() -> None:
+    """`import dkais` adds a `NullHandler` & no logging config (#16)."""
+    handlers = logging.getLogger("dkais").handlers
+    assert handlers
+    assert all(isinstance(h, logging.NullHandler) for h in handlers)
+    assert importlib.util.find_spec("dkais.logging") is None

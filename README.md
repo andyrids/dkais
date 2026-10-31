@@ -31,6 +31,11 @@ dkais process --start 2026-10 --end 2026-10-07   # to <data-dir>/parquet
 `list --json` emits machine-readable output, `download -j N` sets concurrent downloads (default 4)
 and `process --force` re-converts days that already have Parquet output.
 
+`list` prints a table on a terminal and, when piped, one tab-separated row per archive - the
+`--json` keys in order, without a header. Add `-d` before or after any command for debug logging.
+Exit codes are `0` for success, `1` for a failure (e.g. a failed download), `2` for a usage error,
+`70` for an unexpected error - a bug, please report it - and `130` for Ctrl-C.
+
 Dates are `YYYY`, `YYYY-MM` or `YYYY-MM-DD` and inclusive. `download` and `process` need `--start`
 or `--all` - the full bucket is ~4.2 TB compressed. `download` fetches whole archives (monthly up to
 2024-02, daily since), while `process` converts only the days in range. Both skip completed work,

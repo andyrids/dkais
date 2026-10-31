@@ -18,12 +18,11 @@ from _sim import (
     simulate_download,
     simulate_process,
 )
+from pyclig import ExitCode
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.filesize import decimal, pick_unit_and_suffix
 from rich.live import Live
 from rich.text import Text
-
-from dkais._core import ExitCode
 
 _VERB_WIDTH = 12
 _MAX_BAR = 60
@@ -278,7 +277,7 @@ def download(ctx: DemoContext) -> int:
             "yellow",
             "partial downloads discarded, re-run to resume",
         )
-        return ExitCode.EX_INTERRUPT
+        return ExitCode.INTERRUPT
 
     elapsed = _duration(time.monotonic() - t0)
     ok = len(pending) - len(failed)
@@ -298,7 +297,7 @@ def download(ctx: DemoContext) -> int:
         "yellow" if failed else "green",
         f"{count} ({size}) in {elapsed} → {ctx.raw_dir}",
     )
-    return ExitCode.EX_FAILURE if failed else ExitCode.EX_OK
+    return ExitCode.FAILURE if failed else ExitCode.OK
 
 
 def process(ctx: DemoContext) -> int:
@@ -383,7 +382,7 @@ def process(ctx: DemoContext) -> int:
             "yellow",
             "partial output discarded, re-run to resume",
         )
-        return ExitCode.EX_INTERRUPT
+        return ExitCode.INTERRUPT
 
     elapsed = _duration(time.monotonic() - t0)
     ok = len(members) - len(failed)
@@ -402,4 +401,4 @@ def process(ctx: DemoContext) -> int:
         "yellow" if failed else "green",
         f"{days} processed in {elapsed} → {ctx.parquet_dir}",
     )
-    return ExitCode.EX_FAILURE if failed else ExitCode.EX_OK
+    return ExitCode.FAILURE if failed else ExitCode.OK

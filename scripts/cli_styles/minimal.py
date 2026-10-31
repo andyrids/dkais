@@ -15,6 +15,7 @@ from _sim import (
     simulate_download,
     simulate_process,
 )
+from pyclig import ExitCode
 from rich.console import Console
 from rich.filesize import decimal
 from rich.progress import (
@@ -31,8 +32,6 @@ from rich.progress import (
 )
 from rich.table import Column, Table
 from rich.text import Text
-
-from dkais._core import ExitCode
 
 _GLYPHS = {"dot": "·", "arrow": "→", "tick": "✓", "bang": "!"}
 _ASCII = {"dot": "|", "arrow": "->", "tick": "OK", "bang": "!"}
@@ -245,7 +244,7 @@ def download(ctx: DemoContext) -> int:
         err.print(
             _message("warning:", "yellow", _INTERRUPTED.format("downloads"))
         )
-        return ExitCode.EX_INTERRUPT
+        return ExitCode.INTERRUPT
 
     elapsed = _duration(time.monotonic() - started)
     ok = [a for a in pending if a not in failed]
@@ -271,7 +270,7 @@ def download(ctx: DemoContext) -> int:
         ),
         highlight=False,
     )
-    return ExitCode.EX_FAILURE if failed else ExitCode.EX_OK
+    return ExitCode.FAILURE if failed else ExitCode.OK
 
 
 def process(ctx: DemoContext) -> int:
@@ -319,7 +318,7 @@ def process(ctx: DemoContext) -> int:
         err.print(
             _message("warning:", "yellow", _INTERRUPTED.format("output"))
         )
-        return ExitCode.EX_INTERRUPT
+        return ExitCode.INTERRUPT
 
     elapsed = _duration(time.monotonic() - started)
     if failed:
@@ -343,4 +342,4 @@ def process(ctx: DemoContext) -> int:
         ),
         highlight=False,
     )
-    return ExitCode.EX_FAILURE if failed else ExitCode.EX_OK
+    return ExitCode.FAILURE if failed else ExitCode.OK

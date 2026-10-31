@@ -5,8 +5,8 @@ class Error(Exception):
     """Base-class for all exceptions raised by `dkais`."""
 
 
-class DataDirNotSetError(Error):
-    """Raised when no data directory is given by flag or environment."""
+class BucketError(Error):
+    """Raised when the S3 bucket cannot be listed, e.g. when offline."""
 
 
 class CSVDialectError(Error):
