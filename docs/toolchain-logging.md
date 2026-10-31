@@ -3,51 +3,49 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
+version: 2.0.0
+updated: 2026-10-31
 tags: [logging]
 ---
 
 # Toolchain - `logging`
 
-All logging is handled through the primary package logger. To ensure logs are routed correctly,
-always instantiate loggers using the package name:
+All logging goes through the package logger. Create module loggers from the module name, so
+records propagate to the package logger:
 
 ```python
 import logging
 
-logger = logging.getLogger(__package__)
+logger = logging.getLogger(__name__)
 ```
 
-## Configuration
+## (1) Package logging (library)
 
-Logging configuration lives in `src/dkais/logging/_logging.py` as a single `dictConfig` dictionary
-(`CONFIG`), separated into two distinct contexts to prevent interference with consuming
-applications:
+The package `__init__.py` adds a `NullHandler` to the package logger and does nothing else -
+no handlers, consoles, file reads or `rich.reconfigure()` at import:
 
-### (1) Package logging (library)
+```python
+logging.getLogger(__name__).addHandler(logging.NullHandler())
+```
 
-By default, the package is configured with a `NullHandler`. This prevents the library from
-polluting output when imported as a dependency.
+## (2) CLI logging (application)
 
-- Setup: `configure_pkg_logging()` is called in `src/dkais/__init__.py`.
+`pyclig` configures logging for each run of the CLI, on the package of the group callback:
 
-### (2) CLI logging (application)
+- Without `-d`, warnings and errors print as `warning:` / `error:` lines on STDERR
+- With `-d` or `--debug` (accepted before or after the command), a `RichHandler` prints `DEBUG`
+  records with times and call sites
+- The logger stops propagating during the run and is restored afterwards
 
-When executed as a CLI, logging is configured from `CONFIG` - a single `logging.StreamHandler`
-on STDERR, attached to the `dkais` logger with `propagate = false`.
-
-- Setup: `configure_cli_logging(level)` is called in `src/dkais/__main__.py`
-(if applicable) after argument parsing. The level is `DEBUG` with `-d` or `--debug`, otherwise `WARNING`.
+Do not configure handlers yourself, and do not keep a logging config file.
 
 ## (3) CLI output
 
-Send output to STDOUT. The primary output for your command should go to STDOUT. Anything that is
-machine readable should also go to STDOUT — this is where piping sends things by default.
+Each run has two Rich consoles, created when the run starts and passed in - never module globals:
 
-Send messaging to STDERR. Log messages, errors, and so on should all be sent to STDERR. This means
-that when commands are piped together, these messages are displayed to the user and not fed into
-the next command.
+- `ctx.out` (STDOUT): the primary output, including anything machine-readable
+- `ctx.err` (STDERR): logs, errors, progress and other messages
 
-- STDOUT (`CLI_CONSOLE`): primary CLI output
-- STDERR (`GLOBAL_CONSOLE`): logs, errors, progress, and other diagnostic metadata
-
-Check TTY on the stream being written. Do not disable STDERR progress because STDOUT is piped.
+Pass `ctx.err` to every `Progress` or `Status`, so log lines and live displays share one console.
+Check the TTY of the stream being written: do not disable STDERR progress because STDOUT is
+piped. Gate animation on `console.is_interactive`.
