@@ -119,6 +119,24 @@ def _date_range(f: FC) -> FC:
     )(f)
 
 
+def _check_range(start: date | None, end: date | None) -> None:
+    """Check that `--start` is not after `--end`.
+
+    NOTE: An inverted range inside one month still overlaps that month's
+    archive, so it would otherwise select the whole month.
+
+    Args:
+        start: The `--start` value.
+        end: The `--end` value.
+
+    Raises:
+        click.UsageError: If both are given and `start` is after `end`.
+    """
+    if start and end and start > end:
+        msg = f"`--start` {start} is after `--end` {end}"
+        raise click.UsageError(msg)
+
+
 def _require_selection(
     select_all: bool, start: date | None, end: date | None
 ) -> None:
@@ -133,13 +151,15 @@ def _require_selection(
         end: The `--end` value.
 
     Raises:
-        click.UsageError: If the selection is missing or contradictory.
+        click.UsageError: If the selection is missing, contradictory or
+            inverted.
     """
     if select_all and (start or end):
         msg = "`--all` cannot be combined with `--start`/`--end`"
         raise click.UsageError(msg)
     if not (select_all or start):
         raise click.UsageError("Select archives with `--start` or `--all`")
+    _check_range(start, end)
 
 
 def _tsv(value: object) -> str:
@@ -177,6 +197,7 @@ def command_list(
     Returns:
         The integer process exit code.
     """
+    _check_range(start, end)
     from dkais import _download, _s3
 
     archives = _s3.list_archives(_s3.make_client(), start, end)
@@ -320,17 +341,19 @@ def command_download(
         f"{decimal(total)} · {present} already present",
     )
     began = time.monotonic()
-    try:
-        with reporter(ctx.err, "download", len(pending), total) as report:
-            failed = _download.download_archives(
-                client, pending, raw_dir, report, jobs
+    failed: list[Archive] = []
+    if pending:
+        try:
+            with reporter(ctx.err, "download", len(pending), total) as report:
+                failed = _download.download_archives(
+                    client, pending, raw_dir, report, jobs
+                )
+        except KeyboardInterrupt:
+            logger.warning(
+                "Interrupted - unfinished downloads discarded, "
+                "re-run to download them again"
             )
-    except KeyboardInterrupt:
-        logger.warning(
-            "Interrupted - unfinished downloads discarded, "
-            "re-run to download them again"
-        )
-        return pyclig.ExitCode.INTERRUPT
+            return pyclig.ExitCode.INTERRUPT
 
     elapsed = time.monotonic() - began
     size = sum(a.size for a in pending if a not in failed)

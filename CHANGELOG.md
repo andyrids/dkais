@@ -49,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `list` prints tab-separated rows when STDOUT is piped (#11).
 - `--help`, `-v` & usage errors no longer import polars, boto3 & psutil (#13).
 - A broken STDOUT pipe (`| head`) exits 1 silently, on Windows too.
+- `--start` after `--end` is a usage error (exit 2), instead of selecting the whole month.
+- `download` with every archive already present no longer shows an empty progress bar.
 
 ## [0.1.0] - 2026-10-25
 

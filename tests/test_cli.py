@@ -14,6 +14,7 @@ from unittest import mock
 
 import click
 import pytest
+from botocore.stub import Stubber
 from click.testing import Result
 from pyclig import ExitCode
 from pyclig.testing import invoke
@@ -168,6 +169,22 @@ def test_usage_error_prints_input_literally(value: str) -> None:
     assert "Traceback" not in result.stderr
 
 
+_INVERTED = ["--start", "2026-10-20", "--end", "2026-10-05"]
+
+
+@pytest.mark.parametrize("command", ["list", "download", "process"])
+def test_inverted_range_is_a_usage_error(data_dir: Path, command: str) -> None:
+    """`--start` after `--end` exits 2 before the bucket is listed."""
+    with _mock_bucket(return_value=[]):
+        result = _run([command, *_INVERTED, "--data-dir", str(data_dir)])
+        _s3.list_archives.assert_not_called()
+    assert result.exit_code == ExitCode.USAGE
+    assert result.stdout == ""
+    assert result.stderr.startswith(
+        "error: `--start` 2026-10-20 is after `--end` 2026-10-05\n"
+    )
+
+
 def _logging_listing(*args: object) -> list[_s3.Archive]:
     """Stand in for `list_archives`, logging a debug record."""
     logging.getLogger("dkais._s3").debug("bucket-listed")
@@ -311,6 +328,52 @@ def test_download_summary_is_key_value(data_dir: Path) -> None:
     assert result.stderr.startswith("1 archive to download · 5 bytes")
 
 
+def test_download_skips_transfer_when_nothing_pending(data_dir: Path) -> None:
+    """With every archive present, `download` shows no bar but summarises."""
+    archive = _s3.parse_key("aisdk-2026-10-18.zip", 5)
+    assert archive is not None
+    path = archive.local_path(data_dir / "raw")
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"12345")
+    argv = ["download", "--all", "--data-dir", str(data_dir)]
+    with (
+        _mock_bucket(return_value=[archive]),
+        mock.patch(
+            "dkais._download.download_archives", return_value=[]
+        ) as download,
+    ):
+        result = _run(argv, err_tty=True, interactive=True)
+    download.assert_not_called()
+    assert result.exit_code == ExitCode.OK
+    assert result.stdout.startswith(
+        "downloaded=0 bytes=0 already_present=1 failed=0 elapsed="
+    )
+    assert result.stderr == (
+        "0 archives to download · 0 bytes · 1 already present\n"
+    )
+
+
+def test_download_inverted_range_skips_monthly_archive(data_dir: Path) -> None:
+    """A same-month inverted range no longer downloads the whole month."""
+    client = _s3.make_client()
+    contents = [{"Key": "2026/aisdk-2026-10.zip", "Size": 5}]
+    with (
+        Stubber(client) as stubber,
+        mock.patch.object(_s3, "make_client", return_value=client),
+        mock.patch(
+            "dkais._download.download_archives", return_value=[]
+        ) as download,
+    ):
+        stubber.add_response(
+            "list_objects_v2",
+            {"Contents": contents, "IsTruncated": False},
+            {"Bucket": _s3.BUCKET},
+        )
+        result = _run(["download", *_INVERTED, "--data-dir", str(data_dir)])
+    download.assert_not_called()
+    assert result.exit_code == ExitCode.USAGE
+
+
 def _list_one_processed_day(
     data_dir: Path, *flags: str, **kwargs: Any
 ) -> Result:
@@ -435,6 +498,7 @@ print(loaded, file=sys.__stderr__)
         (["-v"], {}),
         ([], {}),
         (["list", "--start", "nope"], {}),
+        (["list", *_INVERTED], {}),
         (
             [],
             {
@@ -444,7 +508,14 @@ print(loaded, file=sys.__stderr__)
             },
         ),
     ],
-    ids=["help", "version", "bare", "usage-error", "completion"],
+    ids=[
+        "help",
+        "version",
+        "bare",
+        "usage-error",
+        "inverted-range",
+        "completion",
+    ],
 )
 def test_fast_paths_skip_heavy_imports(
     argv: list[str], env: dict[str, str]
