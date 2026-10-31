@@ -18,8 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-31
+
 ### Added
 
+- An example notebook, `docs/example/DKAIS_EXAMPLE.ipynb`, opened from the README's Colab badge.
 - Shell completion (`_DKAIS_COMPLETE`), from click.
 - `exceptions.BucketError`: S3 listing failures print `error:` instead of a traceback.
 - `-n/--dry-run` on `download` & `process` prints what would be done, to STDERR, and stops.
@@ -36,7 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Help: click layout, `-d, --debug` listed for every command, commands in workflow order.
 - A missing data dir is a usage error naming `DKAIS_DATA_DIR`, checked before the selection.
 - `download`/`process` without `--start`/`--all` print `error:`, usage & a hint (exit 2).
-- `docs/standard-cli.md`, `docs/toolchain-logging.md` & `docs/toolchain-pytest.md` (#14).
+- `docs/standard-cli.md`, `docs/toolchain-logging.md` & `docs/toolchain-pytest.md` describe the
+  pyclig CLI, logging & tests (2.0.0 each, with MUST NOT rules) (#14).
 
 ### Removed
 
@@ -53,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - STDOUT honours `FORCE_COLOR`, `TTY_COMPATIBLE` & `NO_COLOR` (#10).
 - `list` prints tab-separated rows when STDOUT is piped (#11).
 - `--help`, `-v` & usage errors no longer import polars, boto3 & psutil (#13).
+- CLI tests assert STDOUT & STDERR separately & no longer patch Rich private attributes (#15).
 - A broken STDOUT pipe (`| head`) exits 1 silently, on Windows too.
 - `--start` after `--end` is a usage error (exit 2), instead of selecting the whole month.
 - `download` with every archive already present no longer shows an empty progress bar.
