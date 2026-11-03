@@ -3,6 +3,8 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
+version: 1.0.1
+updated: 2026-11-02
 tags: [uv, package-management]
 ---
 
@@ -51,9 +53,3 @@ EOF
 ```
 
 NOTE: Any dependencies not included with this project must be declared in the script.
-
-## Indexes
-
-`pkgdx` (the canonical-standards dev dependency) is not on PyPI - it resolves from the GitLab
-project package registry declared as an explicit `[[tool.uv.index]]` in `pyproject.toml`. The
-registry is publicly readable, so no credentials are required.

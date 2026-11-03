@@ -1,6 +1,7 @@
 """Smoke tests for the `dkais` package."""
 
 import importlib
+import logging
 from importlib import metadata
 
 import pytest
@@ -27,3 +28,9 @@ def test_version_fallback_without_metadata(
     finally:
         monkeypatch.undo()
         importlib.reload(dkais)
+
+
+def test_null_handler() -> None:
+    """Assert the package logger has a `NullHandler` for library use."""
+    logger = logging.getLogger(dkais.__name__)
+    assert any(isinstance(h, logging.NullHandler) for h in logger.handlers)

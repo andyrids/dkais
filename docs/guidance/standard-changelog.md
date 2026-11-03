@@ -3,6 +3,8 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
+version: 1.0.0
+updated: 2026-10-30
 tags: [CHANGELOG, documentation, semver]
 ---
 

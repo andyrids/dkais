@@ -3,6 +3,8 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
+version: 1.0.0
+updated: 2026-10-30
 tags: [documentation, markdown, style-guide]
 ---
 
@@ -129,13 +131,15 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
+version: 1.0.0
+updated: yyyy-mm-dd
 tags: [keyword, ...]
 ---
 ```
 
 The keys required at each layer, and the token budget that goes with them, are tabled in
-`AGENTS.md`. This section governs only *where* a frontmatter block is required, not what goes in
-it.
+`standard-context-hierarchy.md`. This section governs only *where* a frontmatter block is
+required, not what goes in it.
 
 ### Scope
 
@@ -147,7 +151,8 @@ prose.
 
 | Tree                          | In scope | Frontmatter schema                          |
 | ----------------------------- | -------- | ------------------------------------------- |
-| `AGENTS.md`, `CONTEXT.md`     | Yes      | Per `AGENTS.md`, by layer                   |
+| `AGENTS.md`, `CONTEXT.md`     | Yes      | Per `standard-context-hierarchy.md`         |
+| `docs/guidance/*.md`          | Yes      | Per `standard-context-hierarchy.md`         |
 | `.claude/**`                  | No       | Harness-owned (`name`, `description`)       |
 | `CHANGELOG.md`, `README.md`   | No       | None - format set by Keep a Changelog       |
 | `skills/*/SKILL.md`           | No       | Harness-owned skill frontmatter             |

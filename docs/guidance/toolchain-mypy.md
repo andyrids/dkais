@@ -3,6 +3,8 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
+version: 1.0.1
+updated: 2026-11-02
 tags: [mypy, typing]
 ---
 
@@ -18,12 +20,15 @@ Mypy is used to enforce standards for typing.
 
 ## Configuration
 
-The Mypy config ships inside the dev dependency `pkgdx` (`src/pkgdx/standards/mypy.ini`) and is
+The Mypy config ships inside the installed `pkgdx` package (`src/pkgdx/standards/mypy.ini`) and is
 applied by the `pkgdx-typing-hook` shim - prefer the hook over a hand-rolled `mypy` invocation.
+Overriding it is covered in `toolchain-pkgdx.md`.
 Enforce the usage of the type hints for all function/method args and return values.
 
 With no target, the bundled `files = .` and `exclude = (^|/)tests/` settings check the project
-from the working directory. An explicit target (`-p`, `-m` or file paths) overrides that default.
+from the working directory, and a project's `[tool.pkgdx] exclude` paths add to that exclusion (see
+`toolchain-pkgdx.md`). An explicit target (`-p`, `-m` or paths) overrides `files = .`, but a folder
+or `-p` target still applies those exclusions below it.
 
 A `-p`/`-m` target is resolved as an installed package, so it needs a `py.typed` marker in the
 package directory - without one, Mypy exits with "missing py.typed marker". The default target reads

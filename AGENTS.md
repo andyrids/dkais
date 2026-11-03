@@ -10,19 +10,16 @@ recommended-context-tokens: 900
 This Python package enables the download of historic AIS data provided by the
 Danish Maritime Authority and its processing into typed Parquet.
 
-This project adheres to [YAGNI](docs/standard-yagni.md) principles.
+This project adheres to [YAGNI](docs/guidance/standard-yagni.md) principles.
 
-## Markdown frontmatter
+## Context hierarchy
 
-Markdown files carry `context-hierarchy`, `context-hierarchy-role` and `immutable` keys, plus
-`recommended-context-tokens` where a target is given. Beyond those:
-
-- Budgets are a signal, not an enforced limit. A file that outgrows one is worth a look - it may
-  have started doing another layer's job.
-- Layer 3 carries tags: [keyword, ...]. immutable: true marks the factory configuration, amended
-  deliberately, not in passing.
+Markdown files declare their layer in frontmatter - read
+[standard-context-hierarchy.md](docs/guidance/standard-context-hierarchy.md) before creating or
+editing one. Files marked `immutable: true` are never edited in passing: propose the change and
+wait for approval.
 
 ## Reference
 
-Standards and references live in `docs/` as `standard-*.md` and `toolchain-*.md` files (Layer 3).
-Load a file when its subject is in play, which can be determined by the frontmatter.
+Standards and references live in `docs/guidance` as `standard-*.md` and `toolchain-*.md` files
+(Layer 3). Load a file when its subject is in play, which can be determined by the frontmatter.
