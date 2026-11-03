@@ -82,6 +82,7 @@ def test_summarise_plain_is_key_value() -> None:
         fields,
         out=out,
         err=err,
+        plain=True,
     )
 
     assert _text(err) == "error: 1 of 8 archives failed, re-run to retry\n"
@@ -94,7 +95,16 @@ def test_summarise_terminal_is_one_line() -> None:
 
     dest = Path("D:/raw")
     _report.summarise(
-        "Processed", "day", 9, 9, " in 1.0s", dest, {}, out=out, err=err
+        "Processed",
+        "day",
+        9,
+        9,
+        " in 1.0s",
+        dest,
+        {},
+        out=out,
+        err=err,
+        plain=False,
     )
 
     assert _text(err) == ""

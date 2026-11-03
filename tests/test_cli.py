@@ -480,6 +480,24 @@ def test_download_all_declined_on_a_terminal(data_dir: Path) -> None:
     assert result.stderr == f"{_PLAN}{_PROMPT}n\nerror: aborted\n"
 
 
+def test_download_summary_on_a_terminal(data_dir: Path) -> None:
+    """On a terminal, `download` ends with a `✓ Downloaded` line."""
+    result, _ = _download_two(data_dir, "--all", "--force", out_tty=True)
+    assert result.exit_code == ExitCode.OK
+    assert result.stdout.startswith("✓ Downloaded 2 archives")
+    assert "downloaded=" not in result.stdout
+
+
+def test_download_plain_summary_on_a_terminal(data_dir: Path) -> None:
+    """`download --plain` prints the `key=value` line even on a terminal."""
+    result, _ = _download_two(
+        data_dir, "--all", "--force", "--plain", out_tty=True
+    )
+    assert result.exit_code == ExitCode.OK
+    assert result.stdout.startswith("downloaded=2 ")
+    assert "✓" not in result.stdout
+
+
 @pytest.mark.parametrize(
     "flags",
     [["--all", "--force"], ["--start", "2026-10"]],
@@ -564,6 +582,15 @@ def test_list_rows_when_piped(data_dir: Path) -> None:
         "2006/aisdk-2006-03.zip\t2006-03-01\t2006-03-31\t3\ttrue\t1\n"
     )
     assert result.stderr == "1 archives, 3 bytes\n"
+
+
+def test_list_rows_with_plain_on_a_terminal(data_dir: Path) -> None:
+    """`list --plain` prints tab-separated rows even on a terminal."""
+    result = _list_one_processed_day(data_dir, "--plain", out_tty=True)
+    assert result.exit_code == ExitCode.OK
+    assert result.stdout == (
+        "2006/aisdk-2006-03.zip\t2006-03-01\t2006-03-31\t3\ttrue\t1\n"
+    )
 
 
 def test_list_rows_empty_when_nothing_listed() -> None:
