@@ -17,7 +17,7 @@ import pytest
 from botocore.stub import Stubber
 from click.testing import Result
 from pyclig import ExitCode
-from pyclig.testing import invoke
+from pyclig.testing import assert_conforms, invoke
 from rich.filesize import decimal
 
 from dkais import _cli, _s3, exceptions
@@ -750,6 +750,11 @@ def test_fast_paths_skip_heavy_imports(
         check=True,
     )
     assert result.stderr.splitlines()[-1] == "[]"
+
+
+def test_cli_conforms_to_the_guidelines() -> None:
+    """The CLI has no findings from pyclig's conformance kit."""
+    assert_conforms(cli)
 
 
 def test_import_installs_only_a_null_handler() -> None:
