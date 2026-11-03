@@ -253,11 +253,12 @@ def summarise(
     *,
     out: Console,
     err: Console,
+    plain: bool,
 ) -> None:
     """Print the failure count to STDERR & the run summary to STDOUT.
 
-    NOTE: On a terminal, STDOUT gets a `✓ Downloaded …` line, marked `!` when
-    anything failed; otherwise a single `key=value` line for scripts.
+    NOTE: STDOUT gets a `✓ Downloaded …` line, marked `!` when anything
+    failed, or with `plain` a single `key=value` line for scripts.
 
     Args:
         verb: The past-tense verb, e.g. `Downloaded`.
@@ -269,12 +270,13 @@ def summarise(
         fields: The `key=value` fields for plain output.
         out: The STDOUT console.
         err: The STDERR console.
+        plain: Print the `key=value` line (`ctx.format == "plain"`).
     """
     failed = attempted - done
     if failed:
         message = f"{failed} of {plural(attempted, noun)} failed, re-run"
         pyclig.notice(err, level="error", message=f"{message} to retry")
-    if out.is_terminal:
+    if not plain:
         count = plural(done, noun)
         mark = Text("✓", style="green")
         if failed:
