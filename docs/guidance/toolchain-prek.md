@@ -3,6 +3,8 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
+version: 1.0.0
+updated: 2026-10-30
 tags: [prek, pre-commit]
 ---
 
@@ -18,8 +20,10 @@ Prek is used as a pre-commit hook manager and is installed as a dependency. Runn
 - `uv run prek run -vvv` - Run hooks with verbose output
 - `uv run prek run --all-files` - Run hooks for all files
 - `uv run prek validate-config prek.toml` - Validate a Prek config
+- `uv run prek update --repo <repo>` - Move a remote repo's `rev` to its latest release
 
 ## Configuration
 
 - Project config: `prek.toml`
-  - MUST not be changed by hand - re-run `uv run pkgdx init` instead
+  - Shared with `pkgdx`, which manages its own hooks there - read `toolchain-pkgdx.md` before
+    editing it

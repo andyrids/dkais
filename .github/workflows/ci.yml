@@ -22,6 +22,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      # .secrets.baseline comes from `pkgdx init`: remove it from this list if `pkgdx` is removed
       - name: Check committed lock, hook config & secrets baseline
         run: |
           for f in uv.lock prek.toml .secrets.baseline; do

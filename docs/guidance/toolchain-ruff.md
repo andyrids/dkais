@@ -3,6 +3,8 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
+version: 1.0.0
+updated: 2026-10-30
 tags: [ruff, formatting]
 ---
 
@@ -18,6 +20,6 @@ Ruff is used to implement Python linting and formatting standards.
 
 ## Configuration
 
-The Ruff config ships inside the installed dev dependency `pkgdx` package
-(`src/pkgdx/standards/ruff.toml`) and is applied by the `pkgdx-lint-hook` and `pkgdx-format-hook`
-shims - prefer the hooks over a hand-rolled `ruff` invocation.
+The Ruff config ships inside the installed `pkgdx` package (`src/pkgdx/standards/ruff.toml`) and
+is applied by the `pkgdx-lint-hook` and `pkgdx-format-hook` shims - prefer the hooks over a
+hand-rolled `ruff` invocation. Overriding it is covered in `toolchain-pkgdx.md`.

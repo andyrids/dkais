@@ -1,7 +1,7 @@
 """Terminal output for `dkais download` & `dkais process`.
 
 Two renderings share one interface, chosen per stream as the TTY check in
-`docs/toolchain-logging.md` requires:
+`docs/guidance/toolchain-logging.md` requires:
 
 - minimal (an interactive terminal): a dim intro line, one transient
   progress line with `warning:` / `error:` messages above it, then a one

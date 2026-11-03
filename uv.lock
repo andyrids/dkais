@@ -506,7 +506,7 @@ requires-dist = [
 dev = [
     { name = "boto3-stubs", extras = ["s3"], specifier = ">=1.43.116" },
     { name = "coverage" },
-    { name = "pkgdx", index = "https://gitlab.com/api/v4/projects/82928123/packages/pypi/simple" },
+    { name = "pkgdx", specifier = "~=0.7" },
     { name = "pymarkdownlnt" },
     { name = "pytest" },
     { name = "types-psutil", specifier = ">=7.2.2.20260906" },
@@ -777,20 +777,22 @@ wheels = [
 
 [[package]]
 name = "pkgdx"
-version = "0.4.1"
-source = { registry = "https://gitlab.com/api/v4/projects/82928123/packages/pypi/simple" }
+version = "0.7.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "click" },
     { name = "detect-secrets" },
     { name = "mypy" },
     { name = "prek" },
+    { name = "pyclig" },
     { name = "pymarkdownlnt" },
     { name = "rich" },
     { name = "ruff" },
     { name = "tomlkit" },
 ]
-sdist = { url = "https://gitlab.com/api/v4/projects/82928123/packages/pypi/files/3b1e62e0ea182cd909133ba4ea9b95cfee82a075881e04423de17f56859fd4ce/pkgdx-0.4.1.tar.gz", hash = "sha256:3b1e62e0ea182cd909133ba4ea9b95cfee82a075881e04423de17f56859fd4ce" }
+sdist = { url = "https://files.pythonhosted.org/packages/f5/e5/bf63cba659c951b43929e015d0ac1eb51e053ce79b981942dd4673c65d78/pkgdx-0.7.0.tar.gz", hash = "sha256:a60340709b4f963f050c87d272f8f6a50c80b1c1937b2656c4af719976a96e75", size = 32247, upload-time = "2026-11-02T12:44:34.51Z" }
 wheels = [
-    { url = "https://gitlab.com/api/v4/projects/82928123/packages/pypi/files/bc6f0539d10eacdabcad7191139ac41ed568a5f8e6b9f4e2be2330152645100a/pkgdx-0.4.1-py3-none-any.whl", hash = "sha256:bc6f0539d10eacdabcad7191139ac41ed568a5f8e6b9f4e2be2330152645100a" },
+    { url = "https://files.pythonhosted.org/packages/81/0a/c2815b6a481e29b798a80cb0c465213ca7542b30da093ef099db7fde4a40/pkgdx-0.7.0-py3-none-any.whl", hash = "sha256:0486088c40ede7c5ee40c91bf673e0016ecaa48710b45370f74fa10078adf9d2", size = 32268, upload-time = "2026-11-02T12:44:33.279Z" },
 ]
 
 [[package]]
