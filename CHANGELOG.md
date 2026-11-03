@@ -18,6 +18,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-03
+
+### Added
+
+- `--plain` on `list`, `download` & `process`: tab-separated rows or the `key=value` summary, even
+  on a terminal.
+- `-q`, `--no-color` & `--no-input` on every command, from pyclig 0.3.0.
+- A `GLOBAL OPTIONS:` section and examples first in `--help`.
+- A test that the CLI conforms to pyclig's guidelines.
+
+### Changed
+
+- Depends on `pyclig~=0.3.0`.
+- **Breaking:** `FORCE_COLOR` means colour only: the piped summary stays a `key=value` line, with
+  colour on STDERR. `TTY_COMPATIBLE=1` asks for the terminal layout on a pipe.
+- **Breaking:** `download --all` confirms only with a terminal on STDIN and STDERR, and without
+  one exits `2` with a new message, so `download --all 2>log` no longer writes the prompt into the
+  log.
+
+### Fixed
+
+- `download -n -q` and `process -n -q` keep their plan line, instead of printing nothing.
+
 ## [0.2.0] - 2026-10-31
 
 ### Added

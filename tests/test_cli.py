@@ -17,7 +17,7 @@ import pytest
 from botocore.stub import Stubber
 from click.testing import Result
 from pyclig import ExitCode
-from pyclig.testing import invoke
+from pyclig.testing import assert_conforms, invoke
 from rich.filesize import decimal
 
 from dkais import _cli, _s3, exceptions
@@ -118,12 +118,14 @@ def test_commands_listed_in_workflow_order() -> None:
 def test_command_help_lists_examples(
     command: str, examples: list[str]
 ) -> None:
-    """Each command's `--help` ends with its own `EXAMPLES:` section."""
+    """Each command's `--help` leads with its own `EXAMPLES:` section."""
     result = _run([command, "--help"])
     assert result.exit_code == ExitCode.OK
     lines = result.stdout.splitlines()
-    listed = lines[lines.index("EXAMPLES:") + 1 :]
+    start = lines.index("EXAMPLES:") + 1
+    listed = lines[start : lines.index("", start)]
     assert [line.strip() for line in listed] == examples
+    assert lines.index("EXAMPLES:") < lines.index("OPTIONS:")
 
 
 @pytest.mark.parametrize("command", ["download", "process"])
@@ -358,6 +360,22 @@ def test_process_dry_run_writes_nothing(
     assert all(path.exists() for path in stale)
 
 
+def test_process_dry_run_keeps_plan_when_quiet(
+    data_dir: Path, samples: Samples, write_zip: ZipWriter
+) -> None:
+    """`process -n -q` still prints the plan: it is the whole output."""
+    name, text = samples["comma-22"]
+    write_zip(data_dir / "raw/2006/aisdk-2006-03.zip", {name: text})
+
+    argv = ["process", "--all", "-n", "-q", "--data-dir", str(data_dir)]
+    result = _run(argv)
+    assert result.exit_code == ExitCode.OK
+    assert result.stdout == ""
+    assert result.stderr == (
+        f"1 day to process · {decimal(len(text))} CSV · 0 already processed\n"
+    )
+
+
 def test_process_reports_failed_days(
     data_dir: Path, write_zip: ZipWriter
 ) -> None:
@@ -445,9 +463,10 @@ def test_download_all_without_terminal_needs_force(data_dir: Path) -> None:
     download.assert_not_called()
     assert result.exit_code == ExitCode.USAGE
     assert result.stdout == ""
+    assert "STDIN is not a terminal" not in result.stderr
     assert result.stderr == (
-        f"{_PLAN}error: confirmation needed, but STDIN is not a terminal - "
-        "pass `--force` to proceed\n"
+        f"{_PLAN}error: confirmation needed, but there is no terminal to ask "
+        "on - pass `--force` to proceed\n"
         "\n"
         "USAGE:\n"
         "  dkais download [options]\n"
@@ -459,7 +478,7 @@ def test_download_all_without_terminal_needs_force(data_dir: Path) -> None:
 def test_download_all_confirmed_on_a_terminal(data_dir: Path) -> None:
     """On a terminal, `download --all` names the count & size; `y` proceeds."""
     result, download = _download_two(
-        data_dir, "--all", in_tty=True, input="y\n"
+        data_dir, "--all", in_tty=True, err_tty=True, input="y\n"
     )
     download.assert_called_once()
     assert result.exit_code == ExitCode.OK
@@ -469,12 +488,30 @@ def test_download_all_confirmed_on_a_terminal(data_dir: Path) -> None:
 def test_download_all_declined_on_a_terminal(data_dir: Path) -> None:
     """On a terminal, answering `n` to `download --all` aborts with exit 1."""
     result, download = _download_two(
-        data_dir, "--all", in_tty=True, input="n\n"
+        data_dir, "--all", in_tty=True, err_tty=True, input="n\n"
     )
     download.assert_not_called()
     assert result.exit_code == ExitCode.FAILURE
     assert result.stdout == ""
     assert result.stderr == f"{_PLAN}{_PROMPT}n\nerror: aborted\n"
+
+
+def test_download_summary_on_a_terminal(data_dir: Path) -> None:
+    """On a terminal, `download` ends with a `✓ Downloaded` line."""
+    result, _ = _download_two(data_dir, "--all", "--force", out_tty=True)
+    assert result.exit_code == ExitCode.OK
+    assert result.stdout.startswith("✓ Downloaded 2 archives")
+    assert "downloaded=" not in result.stdout
+
+
+def test_download_plain_summary_on_a_terminal(data_dir: Path) -> None:
+    """`download --plain` prints the `key=value` line even on a terminal."""
+    result, _ = _download_two(
+        data_dir, "--all", "--force", "--plain", out_tty=True
+    )
+    assert result.exit_code == ExitCode.OK
+    assert result.stdout.startswith("downloaded=2 ")
+    assert "✓" not in result.stdout
 
 
 @pytest.mark.parametrize(
@@ -500,6 +537,15 @@ def test_download_dry_run_stops_after_plan(
 ) -> None:
     """`download -n` prints only the plan, on STDERR, even before a prompt."""
     result, download = _download_two(data_dir, *flags, in_tty=True)
+    download.assert_not_called()
+    assert result.exit_code == ExitCode.OK
+    assert result.stdout == ""
+    assert result.stderr == _PLAN
+
+
+def test_download_dry_run_keeps_plan_when_quiet(data_dir: Path) -> None:
+    """`download -n -q` still prints the plan: it is the whole output."""
+    result, download = _download_two(data_dir, "--all", "-n", "-q")
     download.assert_not_called()
     assert result.exit_code == ExitCode.OK
     assert result.stdout == ""
@@ -563,6 +609,15 @@ def test_list_rows_when_piped(data_dir: Path) -> None:
     assert result.stderr == "1 archives, 3 bytes\n"
 
 
+def test_list_rows_with_plain_on_a_terminal(data_dir: Path) -> None:
+    """`list --plain` prints tab-separated rows even on a terminal."""
+    result = _list_one_processed_day(data_dir, "--plain", out_tty=True)
+    assert result.exit_code == ExitCode.OK
+    assert result.stdout == (
+        "2006/aisdk-2006-03.zip\t2006-03-01\t2006-03-31\t3\ttrue\t1\n"
+    )
+
+
 def test_list_rows_empty_when_nothing_listed() -> None:
     """An empty listing prints nothing to STDOUT."""
     with _mock_bucket(return_value=[]):
@@ -613,13 +668,26 @@ def _process_one_day(
     return result.stdout
 
 
-def test_forced_colour_styles_piped_summary(
+def test_tty_compatible_styles_piped_summary(
     data_dir: Path, samples: Samples, write_zip: ZipWriter
 ) -> None:
-    """`FORCE_COLOR=1` renders the piped summary as on a terminal (#10)."""
-    stdout = _process_one_day(data_dir, samples, write_zip, FORCE_COLOR="1")
+    """`TTY_COMPATIBLE=1` renders the piped summary as on a terminal.
+
+    NOTE: #10 asked this of `FORCE_COLOR`; since pyclig 0.3.0 that variable
+    means colour only, so `TTY_COMPATIBLE=1` is the way to ask for layout.
+    """
+    stdout = _process_one_day(data_dir, samples, write_zip, TTY_COMPATIBLE="1")
     assert "\x1b[" in stdout
     assert "Processed 1 day" in stdout
+
+
+def test_forced_colour_keeps_key_value_summary(
+    data_dir: Path, samples: Samples, write_zip: ZipWriter
+) -> None:
+    """`FORCE_COLOR=1` on a pipe keeps the `key=value` summary line."""
+    stdout = _process_one_day(data_dir, samples, write_zip, FORCE_COLOR="1")
+    assert stdout.startswith("processed=1 already_processed=0 failed=0 ")
+    assert "Processed 1 day" not in stdout
 
 
 def test_piped_summary_plain_by_default(
@@ -682,6 +750,11 @@ def test_fast_paths_skip_heavy_imports(
         check=True,
     )
     assert result.stderr.splitlines()[-1] == "[]"
+
+
+def test_cli_conforms_to_the_guidelines() -> None:
+    """The CLI has no findings from pyclig's conformance kit."""
+    assert_conforms(cli)
 
 
 def test_import_installs_only_a_null_handler() -> None:

@@ -162,6 +162,16 @@ def _require_selection(
     _check_range(start, end)
 
 
+def _plan(ctx: pyclig.Context, message: str, *, dry_run: bool) -> None:
+    """Print the plan to STDERR - kept under `-q` for a dry run, its output."""
+    if dry_run:
+        ctx.err.print(
+            Text(message, style="dim"), soft_wrap=not ctx.err.is_terminal
+        )
+    else:
+        pyclig.info(ctx.err, message=message)
+
+
 def _tsv(value: object) -> str:
     """Format a `list` row value for tab-separated output."""
     if isinstance(value, bool):
@@ -180,6 +190,7 @@ def _tsv(value: object) -> str:
 @_data_dir(required=False)
 @_date_range
 @pyclig.options.json_output(help="Output as a JSON array")
+@pyclig.options.plain(help="Output tab-separated rows, as when piped")
 @pyclig.pass_context
 def command_list(
     ctx: pyclig.Context,
@@ -191,8 +202,9 @@ def command_list(
     """List bucket archives & local state.
 
     \f
-    NOTE: Off a terminal, rows are tab-separated - the `--json` keys, in
-    order, without a header - and the caption goes to STDERR.
+    NOTE: Off a terminal or with `--plain`, rows are tab-separated - the
+    `--json` keys, in order, without a header - and the caption goes to
+    STDERR.
 
     Args:
         ctx: The CLI context.
@@ -237,7 +249,7 @@ def command_list(
 
     total = decimal(sum(a.size for a in archives))
     caption = f"{len(archives)} archives, {total}"
-    if not ctx.out.is_terminal:
+    if ctx.format == "plain":
         for row in rows:
             click.echo("\t".join(_tsv(value) for value in row.values()))
         pyclig.info(ctx.err, message=caption)
@@ -315,6 +327,7 @@ def _processed_days(archive: "Archive", parquet_dir: Path) -> int:
     help="Concurrent file downloads (default: 4)",
 )
 @pyclig.options.dry_run(help="Show what would be downloaded, then stop")
+@pyclig.options.plain(help="Summarise as `key=value`, as when piped")
 @pyclig.pass_context
 def command_download(
     ctx: pyclig.Context,
@@ -362,9 +375,10 @@ def command_download(
     present = len(archives) - len(pending)
     total = sum(a.size for a in pending)
     count, volume = plural(len(pending), "archive"), decimal(total)
-    pyclig.info(
-        ctx.err,
-        message=f"{count} to download · {volume} · {present} already present",
+    _plan(
+        ctx,
+        f"{count} to download · {volume} · {present} already present",
+        dry_run=dry_run,
     )
     if dry_run:
         return pyclig.ExitCode.OK
@@ -407,6 +421,7 @@ def command_download(
         },
         out=ctx.out,
         err=ctx.err,
+        plain=ctx.format == "plain",
     )
     return pyclig.ExitCode.FAILURE if failed else pyclig.ExitCode.OK
 
@@ -469,6 +484,7 @@ def _result(future: "Future[bytes | Path]") -> bytes | Path:
 @pyclig.options.select_all(help="Select every archive")
 @pyclig.options.force(help="Re-process days that already have Parquet output")
 @pyclig.options.dry_run(help="Show what would be processed, then stop")
+@pyclig.options.plain(help="Summarise as `key=value`, as when piped")
 @pyclig.pass_context
 def command_process(
     ctx: pyclig.Context,
@@ -530,10 +546,11 @@ def command_process(
     skipped = len(in_range) - len(members)
 
     csv_size = decimal(sum(member.size for member in members))
-    pyclig.info(
-        ctx.err,
-        message=f"{plural(len(members), 'day')} to process · {csv_size} CSV "
+    _plan(
+        ctx,
+        f"{plural(len(members), 'day')} to process · {csv_size} CSV "
         f"· {skipped} already processed",
+        dry_run=dry_run,
     )
     if dry_run:
         return pyclig.ExitCode.OK
@@ -607,5 +624,6 @@ def command_process(
         },
         out=ctx.out,
         err=ctx.err,
+        plain=ctx.format == "plain",
     )
     return pyclig.ExitCode.FAILURE if failed else pyclig.ExitCode.OK
