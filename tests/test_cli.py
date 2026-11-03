@@ -118,12 +118,14 @@ def test_commands_listed_in_workflow_order() -> None:
 def test_command_help_lists_examples(
     command: str, examples: list[str]
 ) -> None:
-    """Each command's `--help` ends with its own `EXAMPLES:` section."""
+    """Each command's `--help` leads with its own `EXAMPLES:` section."""
     result = _run([command, "--help"])
     assert result.exit_code == ExitCode.OK
     lines = result.stdout.splitlines()
-    listed = lines[lines.index("EXAMPLES:") + 1 :]
+    start = lines.index("EXAMPLES:") + 1
+    listed = lines[start : lines.index("", start)]
     assert [line.strip() for line in listed] == examples
+    assert lines.index("EXAMPLES:") < lines.index("OPTIONS:")
 
 
 @pytest.mark.parametrize("command", ["download", "process"])
@@ -445,9 +447,10 @@ def test_download_all_without_terminal_needs_force(data_dir: Path) -> None:
     download.assert_not_called()
     assert result.exit_code == ExitCode.USAGE
     assert result.stdout == ""
+    assert "STDIN is not a terminal" not in result.stderr
     assert result.stderr == (
-        f"{_PLAN}error: confirmation needed, but STDIN is not a terminal - "
-        "pass `--force` to proceed\n"
+        f"{_PLAN}error: confirmation needed, but there is no terminal to ask "
+        "on - pass `--force` to proceed\n"
         "\n"
         "USAGE:\n"
         "  dkais download [options]\n"
@@ -459,7 +462,7 @@ def test_download_all_without_terminal_needs_force(data_dir: Path) -> None:
 def test_download_all_confirmed_on_a_terminal(data_dir: Path) -> None:
     """On a terminal, `download --all` names the count & size; `y` proceeds."""
     result, download = _download_two(
-        data_dir, "--all", in_tty=True, input="y\n"
+        data_dir, "--all", in_tty=True, err_tty=True, input="y\n"
     )
     download.assert_called_once()
     assert result.exit_code == ExitCode.OK
@@ -469,7 +472,7 @@ def test_download_all_confirmed_on_a_terminal(data_dir: Path) -> None:
 def test_download_all_declined_on_a_terminal(data_dir: Path) -> None:
     """On a terminal, answering `n` to `download --all` aborts with exit 1."""
     result, download = _download_two(
-        data_dir, "--all", in_tty=True, input="n\n"
+        data_dir, "--all", in_tty=True, err_tty=True, input="n\n"
     )
     download.assert_not_called()
     assert result.exit_code == ExitCode.FAILURE
@@ -613,13 +616,26 @@ def _process_one_day(
     return result.stdout
 
 
-def test_forced_colour_styles_piped_summary(
+def test_tty_compatible_styles_piped_summary(
     data_dir: Path, samples: Samples, write_zip: ZipWriter
 ) -> None:
-    """`FORCE_COLOR=1` renders the piped summary as on a terminal (#10)."""
-    stdout = _process_one_day(data_dir, samples, write_zip, FORCE_COLOR="1")
+    """`TTY_COMPATIBLE=1` renders the piped summary as on a terminal.
+
+    NOTE: #10 asked this of `FORCE_COLOR`; since pyclig 0.3.0 that variable
+    means colour only, so `TTY_COMPATIBLE=1` is the way to ask for layout.
+    """
+    stdout = _process_one_day(data_dir, samples, write_zip, TTY_COMPATIBLE="1")
     assert "\x1b[" in stdout
     assert "Processed 1 day" in stdout
+
+
+def test_forced_colour_keeps_key_value_summary(
+    data_dir: Path, samples: Samples, write_zip: ZipWriter
+) -> None:
+    """`FORCE_COLOR=1` on a pipe keeps the `key=value` summary line."""
+    stdout = _process_one_day(data_dir, samples, write_zip, FORCE_COLOR="1")
+    assert stdout.startswith("processed=1 already_processed=0 failed=0 ")
+    assert "Processed 1 day" not in stdout
 
 
 def test_piped_summary_plain_by_default(
