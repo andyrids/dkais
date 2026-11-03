@@ -360,6 +360,22 @@ def test_process_dry_run_writes_nothing(
     assert all(path.exists() for path in stale)
 
 
+def test_process_dry_run_keeps_plan_when_quiet(
+    data_dir: Path, samples: Samples, write_zip: ZipWriter
+) -> None:
+    """`process -n -q` still prints the plan: it is the whole output."""
+    name, text = samples["comma-22"]
+    write_zip(data_dir / "raw/2006/aisdk-2006-03.zip", {name: text})
+
+    argv = ["process", "--all", "-n", "-q", "--data-dir", str(data_dir)]
+    result = _run(argv)
+    assert result.exit_code == ExitCode.OK
+    assert result.stdout == ""
+    assert result.stderr == (
+        f"1 day to process · {decimal(len(text))} CSV · 0 already processed\n"
+    )
+
+
 def test_process_reports_failed_days(
     data_dir: Path, write_zip: ZipWriter
 ) -> None:
@@ -521,6 +537,15 @@ def test_download_dry_run_stops_after_plan(
 ) -> None:
     """`download -n` prints only the plan, on STDERR, even before a prompt."""
     result, download = _download_two(data_dir, *flags, in_tty=True)
+    download.assert_not_called()
+    assert result.exit_code == ExitCode.OK
+    assert result.stdout == ""
+    assert result.stderr == _PLAN
+
+
+def test_download_dry_run_keeps_plan_when_quiet(data_dir: Path) -> None:
+    """`download -n -q` still prints the plan: it is the whole output."""
+    result, download = _download_two(data_dir, "--all", "-n", "-q")
     download.assert_not_called()
     assert result.exit_code == ExitCode.OK
     assert result.stdout == ""

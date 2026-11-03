@@ -162,6 +162,16 @@ def _require_selection(
     _check_range(start, end)
 
 
+def _plan(ctx: pyclig.Context, message: str, *, dry_run: bool) -> None:
+    """Print the plan to STDERR - kept under `-q` for a dry run, its output."""
+    if dry_run:
+        ctx.err.print(
+            Text(message, style="dim"), soft_wrap=not ctx.err.is_terminal
+        )
+    else:
+        pyclig.info(ctx.err, message=message)
+
+
 def _tsv(value: object) -> str:
     """Format a `list` row value for tab-separated output."""
     if isinstance(value, bool):
@@ -365,9 +375,10 @@ def command_download(
     present = len(archives) - len(pending)
     total = sum(a.size for a in pending)
     count, volume = plural(len(pending), "archive"), decimal(total)
-    pyclig.info(
-        ctx.err,
-        message=f"{count} to download · {volume} · {present} already present",
+    _plan(
+        ctx,
+        f"{count} to download · {volume} · {present} already present",
+        dry_run=dry_run,
     )
     if dry_run:
         return pyclig.ExitCode.OK
@@ -535,10 +546,11 @@ def command_process(
     skipped = len(in_range) - len(members)
 
     csv_size = decimal(sum(member.size for member in members))
-    pyclig.info(
-        ctx.err,
-        message=f"{plural(len(members), 'day')} to process · {csv_size} CSV "
+    _plan(
+        ctx,
+        f"{plural(len(members), 'day')} to process · {csv_size} CSV "
         f"· {skipped} already processed",
+        dry_run=dry_run,
     )
     if dry_run:
         return pyclig.ExitCode.OK
