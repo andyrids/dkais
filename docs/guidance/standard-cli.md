@@ -3,8 +3,8 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
-version: 2.1.0
-updated: 2026-11-03
+version: 2.2.0
+updated: 2026-11-04
 tags: [CLI]
 ---
 
@@ -69,11 +69,12 @@ person reads it - check the stream being written, not the other one.
 
 - Provide machine-readable output where it does not hurt usability
 - Use `--plain` where human-readable output breaks machine-readable output
-  (`pyclig.options.plain()` on the commands that produce records; branch on `ctx.format`)
-- Print formatted JSON when `--json` is passed (`pyclig.options.json_output()`;
-  `ctx.format == "json"`)
-- Print output on success, but keep it brief
-- Tell the user when state changes
+  (`pyclig.options.plain()` on the commands that produce records; print them with `ctx.emit`,
+  which follows `ctx.format`)
+- Print formatted JSON when `--json` is passed (`pyclig.options.json_output()`; `ctx.emit` prints
+  the records as an indented list)
+- Print output on success, but keep it brief (`pyclig.summary`, dropped by `-q` unless `failed`)
+- Tell the user when state changes (`pyclig.row`, dropped by `-q` unless `essential`)
 - Provide `-q` to suppress non-essential output (pyclig, on every command: `info` lines and
   animation are dropped; notices, hints and STDOUT stay)
 - Disable colour when a stream is not a TTY, `NO_COLOR` is set, `TERM` is `dumb` or `--no-color` is
