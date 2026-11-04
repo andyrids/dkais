@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Depends on `pyclig~=0.4.0`, with `pkgdx~=0.9` in development.
+- Updated to Copier template v0.5.0.
+
 ## [0.3.0] - 2026-11-03
 
 ### Added
