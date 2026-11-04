@@ -3,8 +3,8 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
-version: 2.0.0
-updated: 2026-10-31
+version: 2.1.0
+updated: 2026-11-03
 tags: [pytest, unit-testing]
 ---
 
@@ -30,9 +30,14 @@ Pytest is used for unit testing, with tests colocated in `tests/`.
 - Test modules: `tests/test_<module>.py`, mirroring `src/dkais/<module>.py`
 - Shared fixtures live once in `tests/conftest.py` and are consumed via dependency injection
   rather than re-declared per test module
-- CLI tests run through `pyclig.testing.invoke`, setting each stream's TTY with `out_tty` /
-  `err_tty` and asserting `result.stdout` and `result.stderr` separately. They MUST NOT patch
-  Rich private attributes (`_force_terminal`, `_width`, `_color_system`) or module consoles
+- CLI tests run through `pyclig.testing.invoke`, which takes any `pyclig.Command` or `Group`,
+  setting each stream's TTY with `out_tty` / `err_tty` and asserting `result.stdout` and
+  `result.stderr` separately. They MUST NOT patch Rich private attributes (`_force_terminal`,
+  `_width`, `_color_system`) or module consoles. `in_tty` and `err_tty` must both be True for a test
+  that answers a prompt
+- Every CLI has one test calling `pyclig.testing.assert_conforms(cli)` with a reason for each
+  ignored rule. It is a unit test - it never runs a command body - and complements the
+  `conformance` tier, which runs real tools; the two are not the same thing
 - Use a subprocess only where real streams matter - broken pipes, encodings, colour variables
 - Any dataclass instances should be built via factory fixtures that supply defaults for every field
   and accept `**overrides` - tests override only the fields they assert on, so a model field

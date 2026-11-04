@@ -3,8 +3,8 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
-version: 2.0.0
-updated: 2026-10-31
+version: 2.1.0
+updated: 2026-11-03
 tags: [CLI]
 ---
 
@@ -36,10 +36,14 @@ instead of the next command in a pipe.
 
 ## (2) Help
 
-Show full help for `-h` and `--help` (pyclig).
+Show full help for `-h` and `--help` (pyclig). `-h` wins anywhere before `--`, even after a typo
+(pyclig).
 
-Show concise help when the program runs without the arguments it needs (pyclig, for a bare
-invocation). Ignore this for programs that are interactive by default (e.g. `npm init`).
+Show concise help when the program or a command runs without the arguments it needs (pyclig: a bare
+group, and `no_args_is_help=True` on a command). Ignore this for programs that are interactive by
+default (e.g. `npm init`).
+
+Lead with examples - `--help` lists `EXAMPLES:` before the options (pyclig).
 
 Concise help holds:
 
@@ -65,9 +69,16 @@ person reads it - check the stream being written, not the other one.
 
 - Provide machine-readable output where it does not hurt usability
 - Use `--plain` where human-readable output breaks machine-readable output
-- Print formatted JSON when `--json` is passed
+  (`pyclig.options.plain()` on the commands that produce records; branch on `ctx.format`)
+- Print formatted JSON when `--json` is passed (`pyclig.options.json_output()`;
+  `ctx.format == "json"`)
 - Print output on success, but keep it brief
 - Tell the user when state changes
+- Provide `-q` to suppress non-essential output (pyclig, on every command: `info` lines and
+  animation are dropped; notices, hints and STDOUT stay)
+- Disable colour when a stream is not a TTY, `NO_COLOR` is set, `TERM` is `dumb` or `--no-color` is
+  passed (pyclig). `FORCE_COLOR` means colour only: a piped stream keeps its colour but stays one
+  line per message and never animates; `TTY_COMPATIBLE=1` asks for terminal layout on a pipe
 
 ## (5) Errors
 
@@ -96,16 +107,23 @@ Standard names:
 - `-n`, `--dry-run` (`pyclig.options.dry_run`)
 - `--json` (`pyclig.options.json_output`)
 - `-h`, `--help` (pyclig)
+- `--no-input` (pyclig, on every command)
 - `-o`, `--output`
-- `-q`, `--quiet`
+- `--plain` (`pyclig.options.plain`)
+- `-q`, `--quiet` (pyclig, on every command)
 - `-u`, `--user`
 - `-v`, `--version` (pyclig; `-v` can also mean verbose)
 
+Run flags (`-d`, `-q`, `--no-color`, `--no-input`) work before or after the command name. A
+command's own flag with the same spelling wins (pyclig).
+
 ## (7) Interactivity
 
-- Prompt only when STDIN is an interactive terminal
-- Confirm large or destructive actions with `pyclig.confirm`; `--force` skips the prompt; without
-  a terminal on STDIN, fail and name `--force`
+- Prompt only when STDIN and STDERR are terminals and `--no-input` was not passed (pyclig:
+  `ctx.can_prompt`; `pyclig.confirm` fails naming `--force`, and a click `prompt=` option takes its
+  default or, without one, fails naming the option)
+- Confirm large or destructive actions with `pyclig.confirm`; `--force` skips the prompt; without a
+  terminal, or with `--no-input`, fail and name `--force`
 - Let the user escape (pyclig: Ctrl-C at a prompt)
 
 ## (8) Subcommands
@@ -140,3 +158,9 @@ Interfaces change only after a long, documented deprecation.
 
 - Exit as soon as possible on Ctrl-C (pyclig)
 - Skip long-running cleanup on Ctrl-C and tell the user
+
+## (12) Conformance
+
+- Every CLI has a test calling `pyclig.testing.assert_conforms(cli)`. A finding the CLI accepts is
+  silenced with `ignore={"ID": "reason"}`; the IDs are the rows of pyclig's
+  [`docs/clig-coverage.md`](https://github.com/andyrids/pyclig/blob/main/docs/clig-coverage.md)

@@ -3,8 +3,8 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
-version: 2.0.0
-updated: 2026-10-31
+version: 2.0.1
+updated: 2026-11-03
 tags: [logging]
 ---
 
@@ -33,8 +33,9 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 `pyclig` configures logging for each run of the CLI, on the package of the group callback:
 
 - Without `-d`, warnings and errors print as `warning:` / `error:` lines on STDERR
-- With `-d` or `--debug` (accepted before or after the command), a `RichHandler` prints `DEBUG`
-  records with times and call sites
+- With `-d` or `--debug` (accepted before or after the command), `DEBUG` records print with times
+  and call sites - laid out by a `RichHandler` on a terminal, else one plain line each.
+  `FORCE_COLOR` does not change the layout
 - The logger stops propagating during the run and is restored afterwards
 
 Do not configure handlers yourself, and do not keep a logging config file.
@@ -48,4 +49,4 @@ Each run has two Rich consoles, created when the run starts and passed in - neve
 
 Pass `ctx.err` to every `Progress` or `Status`, so log lines and live displays share one console.
 Check the TTY of the stream being written: do not disable STDERR progress because STDOUT is
-piped. Gate animation on `console.is_interactive`.
+piped. Gate animation on `console.is_interactive`, which `-q` also turns off.
