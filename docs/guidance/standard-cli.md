@@ -3,8 +3,8 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
-version: 2.2.0
-updated: 2026-11-04
+version: 2.3.0
+updated: 2026-11-06
 tags: [CLI]
 ---
 
@@ -103,20 +103,37 @@ Errors are a common reason to read the documentation.
 Standard names:
 
 - `-a`, `--all` (`pyclig.options.select_all`)
-- `-d`, `--debug` (pyclig, on every command)
+- `-d`, `--debug` (pyclig, on every command; also `<PROG>_DEBUG`)
 - `-f`, `--force` (`pyclig.options.force`)
 - `-n`, `--dry-run` (`pyclig.options.dry_run`)
 - `--json` (`pyclig.options.json_output`)
 - `-h`, `--help` (pyclig)
 - `--no-input` (pyclig, on every command)
-- `-o`, `--output`
+- `-o`, `--output` (`pyclig.options.output`)
+- `-p`, `--port` (`pyclig.options.port`)
 - `--plain` (`pyclig.options.plain`)
 - `-q`, `--quiet` (pyclig, on every command)
-- `-u`, `--user`
+- `-u`, `--user` (`pyclig.options.user`)
 - `-v`, `--version` (pyclig; `-v` can also mean verbose)
 
 Run flags (`-d`, `-q`, `--no-color`, `--no-input`) work before or after the command name. A
 command's own flag with the same spelling wins (pyclig).
+
+Configuration, environment and secrets (pyclig 0.5):
+
+- Config is opt-in: `pyclig.group(..., config=pyclig.Config(project=".<name>.toml"))` adds
+  `--config FILE` and, with `profiles=True`, `--profile NAME`. Precedence is flags >
+  environment > `.env` > profile > project file > user file > system file > defaults; the files
+  are TOML and fill click's `default_map`, so top-level keys configure the root and `[sub]` a
+  subcommand
+- Directories come from `pyclig.paths` (`config_dir`, `data_dir`, `system_config_dir`): XDG
+  everywhere but Windows, never created by the library
+- `.env` is read only with `Config(dotenv=True)`, fills declared `envvar=` options the
+  environment left empty, never writes `os.environ`, and skips secret-named keys
+- A secret comes from a file or STDIN, never a flag value or an environment variable:
+  `pyclig.options.secret("token")` adds `--token-file FILE`, where `-` reads a piped STDIN and a
+  terminal STDIN is a usage error
+- `<PROG>_DEBUG=1` and `<PROG>_NO_COLOR=1` act as `-d` and `--no-color` before parsing
 
 ## (7) Interactivity
 
