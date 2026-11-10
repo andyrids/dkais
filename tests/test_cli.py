@@ -4,6 +4,7 @@ import importlib.util
 import json
 import logging
 import os
+import signal
 import subprocess
 import sys
 from collections.abc import Callable
@@ -251,8 +252,8 @@ def test_list_interrupt_exits_130() -> None:
     assert result.stderr == "warning: interrupted\n"
 
 
-def test_download_interrupt_message_unchanged(data_dir: Path) -> None:
-    """Ctrl-C during downloads keeps its tailored message & exits 130."""
+def test_download_interrupt_hints_resume(data_dir: Path) -> None:
+    """Ctrl-C during downloads hints at a re-run & is reported by pyclig."""
     archive = _s3.parse_key("aisdk-2026-10-18.zip", 1)
     with (
         _mock_bucket(return_value=[archive]),
@@ -265,9 +266,58 @@ def test_download_interrupt_message_unchanged(data_dir: Path) -> None:
         )
     assert result.exit_code == ExitCode.INTERRUPT
     assert result.stderr.endswith(
-        "warning: Interrupted - unfinished downloads discarded, "
-        "re-run to download them again\n"
+        "Unfinished downloads discarded - re-run to resume\n"
+        "warning: interrupted\n"
     )
+    assert "Interrupted -" not in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("argv", "env", "expected"),
+    [
+        ([], {}, 60.0),
+        (["--timeout", "2.5"], {}, 2.5),
+        ([], {"DKAIS_TIMEOUT": "7"}, 7.0),
+    ],
+)
+@pytest.mark.parametrize("command", ["list", "download"])
+def test_timeout_sets_the_s3_read_timeout(
+    data_dir: Path,
+    command: str,
+    argv: list[str],
+    env: dict[str, str],
+    expected: float,
+) -> None:
+    """`--timeout` (default 60) reaches the S3 client's read timeout."""
+    clients: list[Any] = []
+    real = _s3.make_client
+
+    def make_client(*args: Any, **kwargs: Any) -> Any:
+        clients.append(client := real(*args, **kwargs))
+        return client
+
+    with (
+        mock.patch.object(_s3, "make_client", side_effect=make_client),
+        mock.patch.object(_s3, "list_archives", return_value=[]),
+    ):
+        result = _run(
+            [command, "--start", "2026", "--data-dir", str(data_dir), *argv],
+            env=env,
+        )
+    assert result.exit_code == ExitCode.OK
+    assert [c.meta.config.read_timeout for c in clients] == [expected]
+    assert clients[0].meta.config.connect_timeout == 10
+
+
+@pytest.mark.parametrize("command", ["list", "download"])
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_timeout_rejects_non_positive(command: str, value: str) -> None:
+    """`--timeout` must be positive - a usage error before the bucket."""
+    with _mock_bucket(return_value=[]):
+        result = _run([command, "--start", "2026", "--timeout", value])
+        _s3.make_client.assert_not_called()
+    assert result.exit_code == ExitCode.USAGE
+    assert "--timeout" in result.stderr
 
 
 def test_bucket_error_is_reported_without_traceback() -> None:
@@ -374,6 +424,80 @@ def test_process_dry_run_keeps_plan_when_quiet(
     assert result.stderr == (
         f"1 day to process · {decimal(len(text))} CSV · 0 already processed\n"
     )
+
+
+def test_process_interrupt_hints_resume_and_cleans_up(
+    data_dir: Path, samples: Samples, write_zip: ZipWriter
+) -> None:
+    """Ctrl-C during `process` hints at a re-run, exits 130 & cleans up."""
+    name, text = samples["comma-22"]
+    write_zip(data_dir / "raw/2006/aisdk-2006-03.zip", {name: text})
+    argv = ["process", "--all", "--data-dir", str(data_dir)]
+
+    memory = mock.Mock(available=0)
+    with (
+        mock.patch("psutil.virtual_memory", return_value=memory),
+        mock.patch("dkais._process.convert", side_effect=KeyboardInterrupt),
+    ):
+        result = _run(argv)
+    assert result.exit_code == ExitCode.INTERRUPT
+    assert result.stderr.endswith(
+        "Partial output discarded - re-run to resume\nwarning: interrupted\n"
+    )
+    assert "Interrupted -" not in result.stderr
+    assert not list(data_dir.glob("tmp/*"))
+    assert not list(data_dir.rglob("*.parquet"))
+
+
+def _sigint(*args: object, **kwargs: object) -> None:
+    """Deliver a real SIGINT, as Ctrl-C does."""
+    signal.raise_signal(signal.SIGINT)
+
+
+def test_process_cleanup_after_a_real_interrupt_is_bounded(
+    data_dir: Path, samples: Samples, write_zip: ZipWriter
+) -> None:
+    """A real Ctrl-C prints the notice at once, then cleans up in a bound."""
+    name, text = samples["comma-22"]
+    write_zip(data_dir / "raw/2006/aisdk-2006-03.zip", {name: text})
+    argv = ["process", "--all", "--data-dir", str(data_dir)]
+
+    memory = mock.Mock(available=0)
+    with (
+        mock.patch("psutil.virtual_memory", return_value=memory),
+        mock.patch("dkais._process.convert", side_effect=_sigint),
+    ):
+        result = _run(argv)
+    assert result.exit_code == ExitCode.INTERRUPT
+    assert result.stderr.endswith(
+        "warning: interrupted\n"
+        "Partial output discarded - re-run to resume\n"
+        "cleaning up - press Ctrl-C again to skip\n"
+    )
+    assert not list(data_dir.glob("tmp/*"))
+
+
+def test_download_cleanup_after_a_real_interrupt_is_bounded(
+    data_dir: Path,
+) -> None:
+    """A real Ctrl-C while downloading shuts the transfers down in a bound."""
+    archive = _s3.parse_key("aisdk-2026-10-18.zip", 1)
+    with (
+        _mock_bucket(return_value=[archive]),
+        mock.patch("dkais._download.wait", side_effect=_sigint),
+    ):
+        result = _run(
+            ["download", "--start", "2026-10", "--data-dir", str(data_dir)]
+        )
+    assert result.exit_code == ExitCode.INTERRUPT
+    # A transfer may report its outcome between these lines
+    expected = [
+        "warning: interrupted",
+        "cleaning up - press Ctrl-C again to skip",
+        "Unfinished downloads discarded - re-run to resume",
+    ]
+    lines = result.stderr.splitlines()
+    assert [line for line in lines if line in expected] == expected
 
 
 def test_process_reports_failed_days(

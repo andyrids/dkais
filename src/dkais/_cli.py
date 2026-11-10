@@ -191,6 +191,11 @@ def _tsv(value: object) -> str:
 @_date_range
 @pyclig.options.json_output(help="Output as a JSON array")
 @pyclig.options.plain(help="Output tab-separated rows, as when piped")
+@pyclig.options.timeout(
+    default=60.0,
+    envvar="DKAIS_TIMEOUT",
+    help="Give up on a stalled S3 read after SECONDS",
+)
 @pyclig.pass_context
 def command_list(
     ctx: pyclig.Context,
@@ -198,6 +203,7 @@ def command_list(
     start: date | None,
     end: date | None,
     json_output: bool,
+    timeout: float,
 ) -> int:
     """List bucket archives & local state.
 
@@ -212,6 +218,7 @@ def command_list(
         start: The range start.
         end: The range end.
         json_output: Print a JSON array instead of a table.
+        timeout: The S3 read timeout, in seconds.
 
     Returns:
         The integer process exit code.
@@ -219,7 +226,7 @@ def command_list(
     _check_range(start, end)
     from dkais import _download, _s3
 
-    archives = _s3.list_archives(_s3.make_client(), start, end)
+    archives = _s3.list_archives(_s3.make_client(timeout=timeout), start, end)
     if data_dir is None:
         logger.warning(
             "No data dir - set `--data-dir` or `DKAIS_DATA_DIR` "
@@ -328,6 +335,11 @@ def _processed_days(archive: "Archive", parquet_dir: Path) -> int:
 )
 @pyclig.options.dry_run(help="Show what would be downloaded, then stop")
 @pyclig.options.plain(help="Summarise as `key=value`, as when piped")
+@pyclig.options.timeout(
+    default=60.0,
+    envvar="DKAIS_TIMEOUT",
+    help="Give up on a stalled S3 read after SECONDS",
+)
 @pyclig.pass_context
 def command_download(
     ctx: pyclig.Context,
@@ -338,6 +350,7 @@ def command_download(
     force: bool,
     jobs: int,
     dry_run: bool,
+    timeout: float,
 ) -> int:
     """Download archives to <data-dir>/raw.
 
@@ -356,6 +369,7 @@ def command_download(
         force: Skip the `--all` confirmation.
         jobs: The number of concurrent file downloads.
         dry_run: Stop after reporting what would be downloaded.
+        timeout: The S3 read timeout, in seconds.
 
     Returns:
         The integer process exit code.
@@ -365,7 +379,7 @@ def command_download(
     from dkais._report import duration, plural, reporter, summarise
 
     raw_dir = data_dir / "raw"
-    client = _s3.make_client(jobs)
+    client = _s3.make_client(jobs, timeout)
     archives = _s3.list_archives(client, start, end)
     if not archives:
         logger.warning("No archives in the selected range")
@@ -391,14 +405,14 @@ def command_download(
         try:
             with reporter(ctx.err, "download", len(pending), total) as report:
                 failed = _download.download_archives(
-                    client, pending, raw_dir, report, jobs
+                    client, pending, raw_dir, report, jobs, ctx.cleanup
                 )
         except KeyboardInterrupt:
-            logger.warning(
-                "Interrupted - unfinished downloads discarded, "
-                "re-run to download them again"
+            pyclig.hint(
+                ctx.err,
+                message="Unfinished downloads discarded - re-run to resume",
             )
-            return pyclig.ExitCode.INTERRUPT
+            raise
 
     elapsed = time.monotonic() - began
     size = sum(a.size for a in pending if a not in failed)
@@ -596,14 +610,15 @@ def command_process(
                     # Free in-memory CSV bytes before the next extraction
                     del extracted
     except KeyboardInterrupt:
-        logger.warning(
-            "Interrupted - partial output discarded, re-run to resume"
+        pyclig.hint(
+            ctx.err, message="Partial output discarded - re-run to resume"
         )
-        return pyclig.ExitCode.INTERRUPT
+        raise
     finally:
         # Discard a prefetched CSV file left by an interrupted run
-        pool.shutdown(wait=True, cancel_futures=True)
-        _process.clean_stale(parquet_dir, tmp_dir)
+        with ctx.cleanup():
+            pool.shutdown(wait=True, cancel_futures=True)
+            _process.clean_stale(parquet_dir, tmp_dir)
 
     elapsed = time.monotonic() - began
     done = len(members) - failed
