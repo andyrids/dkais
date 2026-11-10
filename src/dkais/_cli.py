@@ -394,11 +394,11 @@ def command_download(
                     client, pending, raw_dir, report, jobs
                 )
         except KeyboardInterrupt:
-            logger.warning(
-                "Interrupted - unfinished downloads discarded, "
-                "re-run to download them again"
+            pyclig.hint(
+                ctx.err,
+                message="Unfinished downloads discarded - re-run to resume",
             )
-            return pyclig.ExitCode.INTERRUPT
+            raise
 
     elapsed = time.monotonic() - began
     size = sum(a.size for a in pending if a not in failed)
@@ -596,10 +596,10 @@ def command_process(
                     # Free in-memory CSV bytes before the next extraction
                     del extracted
     except KeyboardInterrupt:
-        logger.warning(
-            "Interrupted - partial output discarded, re-run to resume"
+        pyclig.hint(
+            ctx.err, message="Partial output discarded - re-run to resume"
         )
-        return pyclig.ExitCode.INTERRUPT
+        raise
     finally:
         # Discard a prefetched CSV file left by an interrupted run
         pool.shutdown(wait=True, cancel_futures=True)

@@ -251,8 +251,8 @@ def test_list_interrupt_exits_130() -> None:
     assert result.stderr == "warning: interrupted\n"
 
 
-def test_download_interrupt_message_unchanged(data_dir: Path) -> None:
-    """Ctrl-C during downloads keeps its tailored message & exits 130."""
+def test_download_interrupt_hints_resume(data_dir: Path) -> None:
+    """Ctrl-C during downloads hints at a re-run & is reported by pyclig."""
     archive = _s3.parse_key("aisdk-2026-10-18.zip", 1)
     with (
         _mock_bucket(return_value=[archive]),
@@ -265,9 +265,10 @@ def test_download_interrupt_message_unchanged(data_dir: Path) -> None:
         )
     assert result.exit_code == ExitCode.INTERRUPT
     assert result.stderr.endswith(
-        "warning: Interrupted - unfinished downloads discarded, "
-        "re-run to download them again\n"
+        "Unfinished downloads discarded - re-run to resume\n"
+        "warning: interrupted\n"
     )
+    assert "Interrupted -" not in result.stderr
 
 
 def test_bucket_error_is_reported_without_traceback() -> None:
@@ -374,6 +375,29 @@ def test_process_dry_run_keeps_plan_when_quiet(
     assert result.stderr == (
         f"1 day to process · {decimal(len(text))} CSV · 0 already processed\n"
     )
+
+
+def test_process_interrupt_hints_resume_and_cleans_up(
+    data_dir: Path, samples: Samples, write_zip: ZipWriter
+) -> None:
+    """Ctrl-C during `process` hints at a re-run, exits 130 & cleans up."""
+    name, text = samples["comma-22"]
+    write_zip(data_dir / "raw/2006/aisdk-2006-03.zip", {name: text})
+    argv = ["process", "--all", "--data-dir", str(data_dir)]
+
+    memory = mock.Mock(available=0)
+    with (
+        mock.patch("psutil.virtual_memory", return_value=memory),
+        mock.patch("dkais._process.convert", side_effect=KeyboardInterrupt),
+    ):
+        result = _run(argv)
+    assert result.exit_code == ExitCode.INTERRUPT
+    assert result.stderr.endswith(
+        "Partial output discarded - re-run to resume\nwarning: interrupted\n"
+    )
+    assert "Interrupted -" not in result.stderr
+    assert not list(data_dir.glob("tmp/*"))
+    assert not list(data_dir.rglob("*.parquet"))
 
 
 def test_process_reports_failed_days(
