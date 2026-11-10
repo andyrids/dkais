@@ -26,14 +26,14 @@ dependencies = [
     "click~=8.5",
     "polars>=2.0.0",
     "psutil>=7.2.2",
-    "pyclig~=0.5.0",
+    "pyclig~=0.6.0",
     "rich",
     "zlib-ng>=1.0.0 ; python_full_version < '3.14' or sys_platform != 'win32'",
 ]
 
 [dependency-groups]
 dev = [
-    "pkgdx~=0.10",
+    "pkgdx~=0.11",
     "coverage",
     "pytest",
     "pymarkdownlnt",
