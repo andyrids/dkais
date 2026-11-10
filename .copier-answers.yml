@@ -1,5 +1,5 @@
 # Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
-_commit: v0.6.0
+_commit: v0.7.0
 _src_path: gh:andyrids/copier-python-package
 cli: true
 git_platform: GitHub
