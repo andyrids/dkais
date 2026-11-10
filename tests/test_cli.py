@@ -272,6 +272,54 @@ def test_download_interrupt_hints_resume(data_dir: Path) -> None:
     assert "Interrupted -" not in result.stderr
 
 
+@pytest.mark.parametrize(
+    ("argv", "env", "expected"),
+    [
+        ([], {}, 60.0),
+        (["--timeout", "2.5"], {}, 2.5),
+        ([], {"DKAIS_TIMEOUT": "7"}, 7.0),
+    ],
+)
+@pytest.mark.parametrize("command", ["list", "download"])
+def test_timeout_sets_the_s3_read_timeout(
+    data_dir: Path,
+    command: str,
+    argv: list[str],
+    env: dict[str, str],
+    expected: float,
+) -> None:
+    """`--timeout` (default 60) reaches the S3 client's read timeout."""
+    clients: list[Any] = []
+    real = _s3.make_client
+
+    def make_client(*args: Any, **kwargs: Any) -> Any:
+        clients.append(client := real(*args, **kwargs))
+        return client
+
+    with (
+        mock.patch.object(_s3, "make_client", side_effect=make_client),
+        mock.patch.object(_s3, "list_archives", return_value=[]),
+    ):
+        result = _run(
+            [command, "--start", "2026", "--data-dir", str(data_dir), *argv],
+            env=env,
+        )
+    assert result.exit_code == ExitCode.OK
+    assert [c.meta.config.read_timeout for c in clients] == [expected]
+    assert clients[0].meta.config.connect_timeout == 10
+
+
+@pytest.mark.parametrize("command", ["list", "download"])
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_timeout_rejects_non_positive(command: str, value: str) -> None:
+    """`--timeout` must be positive - a usage error before the bucket."""
+    with _mock_bucket(return_value=[]):
+        result = _run([command, "--start", "2026", "--timeout", value])
+        _s3.make_client.assert_not_called()
+    assert result.exit_code == ExitCode.USAGE
+    assert "--timeout" in result.stderr
+
+
 def test_bucket_error_is_reported_without_traceback() -> None:
     """An expected `Error` prints `error: message` & exits 1."""
     error = exceptions.BucketError("Cannot list bucket `x`: offline")
