@@ -391,7 +391,7 @@ def command_download(
         try:
             with reporter(ctx.err, "download", len(pending), total) as report:
                 failed = _download.download_archives(
-                    client, pending, raw_dir, report, jobs
+                    client, pending, raw_dir, report, jobs, ctx.cleanup
                 )
         except KeyboardInterrupt:
             pyclig.hint(
@@ -602,8 +602,9 @@ def command_process(
         raise
     finally:
         # Discard a prefetched CSV file left by an interrupted run
-        pool.shutdown(wait=True, cancel_futures=True)
-        _process.clean_stale(parquet_dir, tmp_dir)
+        with ctx.cleanup():
+            pool.shutdown(wait=True, cancel_futures=True)
+            _process.clean_stale(parquet_dir, tmp_dir)
 
     elapsed = time.monotonic() - began
     done = len(members) - failed

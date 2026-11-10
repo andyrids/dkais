@@ -3,13 +3,14 @@
 import logging
 import threading
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from concurrent.futures import (
     FIRST_EXCEPTION,
     Future,
     ThreadPoolExecutor,
     wait,
 )
+from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -79,6 +80,7 @@ def download_archives(
     raw_dir: Path,
     reporter: "Reporter",
     jobs: int = 4,
+    cleanup: Callable[[], AbstractContextManager[None]] = nullcontext,
 ) -> list[Archive]:
     """Download archives, `jobs` files at a time.
 
@@ -92,6 +94,7 @@ def download_archives(
         raw_dir: The root directory for raw archives.
         reporter: Receives transferred bytes & each archive's outcome.
         jobs: The number of concurrent file downloads.
+        cleanup: Bounds the shutdown after an interrupt, e.g. `ctx.cleanup`.
 
     Returns:
         The archives that failed to download.
@@ -147,5 +150,6 @@ def download_archives(
         raise
     finally:
         # Waits for aborted transfers to clean up their temporary files
-        executor.shutdown(wait=True, cancel_futures=True)
+        with cleanup():
+            executor.shutdown(wait=True, cancel_futures=True)
     return failed

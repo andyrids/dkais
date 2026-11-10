@@ -4,6 +4,7 @@ import importlib.util
 import json
 import logging
 import os
+import signal
 import subprocess
 import sys
 from collections.abc import Callable
@@ -398,6 +399,57 @@ def test_process_interrupt_hints_resume_and_cleans_up(
     assert "Interrupted -" not in result.stderr
     assert not list(data_dir.glob("tmp/*"))
     assert not list(data_dir.rglob("*.parquet"))
+
+
+def _sigint(*args: object, **kwargs: object) -> None:
+    """Deliver a real SIGINT, as Ctrl-C does."""
+    signal.raise_signal(signal.SIGINT)
+
+
+def test_process_cleanup_after_a_real_interrupt_is_bounded(
+    data_dir: Path, samples: Samples, write_zip: ZipWriter
+) -> None:
+    """A real Ctrl-C prints the notice at once, then cleans up in a bound."""
+    name, text = samples["comma-22"]
+    write_zip(data_dir / "raw/2006/aisdk-2006-03.zip", {name: text})
+    argv = ["process", "--all", "--data-dir", str(data_dir)]
+
+    memory = mock.Mock(available=0)
+    with (
+        mock.patch("psutil.virtual_memory", return_value=memory),
+        mock.patch("dkais._process.convert", side_effect=_sigint),
+    ):
+        result = _run(argv)
+    assert result.exit_code == ExitCode.INTERRUPT
+    assert result.stderr.endswith(
+        "warning: interrupted\n"
+        "Partial output discarded - re-run to resume\n"
+        "cleaning up - press Ctrl-C again to skip\n"
+    )
+    assert not list(data_dir.glob("tmp/*"))
+
+
+def test_download_cleanup_after_a_real_interrupt_is_bounded(
+    data_dir: Path,
+) -> None:
+    """A real Ctrl-C while downloading shuts the transfers down in a bound."""
+    archive = _s3.parse_key("aisdk-2026-10-18.zip", 1)
+    with (
+        _mock_bucket(return_value=[archive]),
+        mock.patch("dkais._download.wait", side_effect=_sigint),
+    ):
+        result = _run(
+            ["download", "--start", "2026-10", "--data-dir", str(data_dir)]
+        )
+    assert result.exit_code == ExitCode.INTERRUPT
+    # A transfer may report its outcome between these lines
+    expected = [
+        "warning: interrupted",
+        "cleaning up - press Ctrl-C again to skip",
+        "Unfinished downloads discarded - re-run to resume",
+    ]
+    lines = result.stderr.splitlines()
+    assert [line for line in lines if line in expected] == expected
 
 
 def test_process_reports_failed_days(
