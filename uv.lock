@@ -497,7 +497,7 @@ requires-dist = [
     { name = "click", specifier = "~=8.5" },
     { name = "polars", specifier = ">=2.0.0" },
     { name = "psutil", specifier = ">=7.2.2" },
-    { name = "pyclig", specifier = "~=0.4.0" },
+    { name = "pyclig", specifier = "~=0.6.0" },
     { name = "rich" },
     { name = "zlib-ng", marker = "python_full_version < '3.14' or sys_platform != 'win32'", specifier = ">=1.0.0" },
 ]
@@ -506,7 +506,7 @@ requires-dist = [
 dev = [
     { name = "boto3-stubs", extras = ["s3"], specifier = ">=1.43.116" },
     { name = "coverage" },
-    { name = "pkgdx", specifier = "~=0.9" },
+    { name = "pkgdx", specifier = "~=0.11" },
     { name = "pymarkdownlnt" },
     { name = "pytest" },
     { name = "types-psutil", specifier = ">=7.2.2.20260906" },
@@ -777,7 +777,7 @@ wheels = [
 
 [[package]]
 name = "pkgdx"
-version = "0.9.0"
+version = "0.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -790,9 +790,9 @@ dependencies = [
     { name = "ruff" },
     { name = "tomlkit" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/28/d0/c04a71801ee21b982c7d29724fdbf6d8aad7807b80bf682dac65c06708eb/pkgdx-0.9.0.tar.gz", hash = "sha256:4ee65019718cb50ce3725bc51ad95a2f1c0facc50b1fff71291012ec09de7542", size = 32696, upload-time = "2026-11-04T21:58:50.337Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e3/0f/309ad667e6d0345e00fe42933770615917c54c5598c15ed639fff9b1dc31/pkgdx-0.11.0.tar.gz", hash = "sha256:748f599f7c5496557d9bd7cbc71244eed8f0b43067644dc9e5b5b73e2faf06e6", size = 32913, upload-time = "2026-11-10T19:03:37.684Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/de/92/f0c34fa333ddfc92937570039e630fabd824a30139082250f4a6d6d1db9d/pkgdx-0.9.0-py3-none-any.whl", hash = "sha256:56f20d00282edbdb0be025f8f212171d477518759d6a756e063df10d0d05ac45", size = 32436, upload-time = "2026-11-04T21:58:49.105Z" },
+    { url = "https://files.pythonhosted.org/packages/8a/85/a3cddb5d9d3f85dc88490cdd073fd6d5d47c4fde7ac235e6a33c24e7264a/pkgdx-0.11.0-py3-none-any.whl", hash = "sha256:f76b2ec47dbf9c8d456965333c798afe9dd60e7986b3a8069e8af031a5964dab", size = 32452, upload-time = "2026-11-10T19:03:36.488Z" },
 ]
 
 [[package]]
@@ -898,15 +898,15 @@ wheels = [
 
 [[package]]
 name = "pyclig"
-version = "0.4.0"
+version = "0.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
     { name = "rich" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c0/77/a86dd2a1c946e9738ec36b9c0945bcb58ed1558198d3000e64a4d73eb27f/pyclig-0.4.0.tar.gz", hash = "sha256:bada5cac93171cbc2d1066b75638c7b556b14782836aa74f17c4275bd738e534", size = 41622, upload-time = "2026-11-04T21:36:42.792Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e0/6d/8985317e740c586e6d1c55d84d222a8374cd8a38b851c4dc962d11b92a46/pyclig-0.6.0.tar.gz", hash = "sha256:327b94fa08f78d6e3dd55f35571c6f753fafae201ab56f835560af9d698f6f27", size = 63692, upload-time = "2026-11-10T17:53:26.708Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ef/74/fd580d503c4700fc910309b6821e1c32cb7c7fc63a9c5c785c0d7c9c37cc/pyclig-0.4.0-py3-none-any.whl", hash = "sha256:975dfd4ba2dd6b824460fb35dd1140262fa6651a6c69a86438ceb80f830458cc", size = 45799, upload-time = "2026-11-04T21:36:41.543Z" },
+    { url = "https://files.pythonhosted.org/packages/36/58/7ec8cb7ab197e92625fcfd79e4094479948a7c31c1c9c23550397d2271cc/pyclig-0.6.0-py3-none-any.whl", hash = "sha256:1f09311bab28c4cd2e0cfc5d70929f9d6b95074e1b4b652e2269f148c1b828c8", size = 69034, upload-time = "2026-11-10T17:53:25.666Z" },
 ]
 
 [[package]]

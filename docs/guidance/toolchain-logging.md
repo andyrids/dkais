@@ -3,8 +3,8 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
-version: 2.0.1
-updated: 2026-11-03
+version: 2.1.0
+updated: 2026-11-10
 tags: [logging]
 ---
 
@@ -37,8 +37,16 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
   and call sites - laid out by a `RichHandler` on a terminal, else one plain line each.
   `FORCE_COLOR` does not change the layout
 - The logger stops propagating during the run and is restored afterwards
+- When the root logger has no handlers, third-party `WARNING` records and `warnings.warn` print
+  as `warning:` lines too - the message only, with `file:line` under `-d`. A root configured by
+  the application is left alone, and both are restored afterwards
+- `<PROG>_LOG_FILE=FILE` appends every record of the run, at `DEBUG`, to `FILE`; a crash adds
+  its traceback and the hint `debug log: FILE`
+- `with ctx.logs_on_failure():` holds a block's info records and prints them only when an
+  exception leaves the block; raise to fail, and keep the block outside `progress` and `status`
 
-Do not configure handlers yourself, and do not keep a logging config file.
+Do not configure handlers yourself, and do not keep a logging config file. Do not call
+`logging.captureWarnings`.
 
 ## (3) CLI output
 

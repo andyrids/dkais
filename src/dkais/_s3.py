@@ -107,12 +107,13 @@ def parse_key(key: str, size: int) -> Archive | None:
     return Archive(key=key, size=size, start=start, end=end)
 
 
-def make_client(jobs: int = 1) -> "S3Client":
+def make_client(jobs: int = 1, timeout: float = 60.0) -> "S3Client":
     """Create an anonymous S3 client for the public bucket.
 
     Args:
         jobs: The number of concurrent file downloads to size the
             connection pool for.
+        timeout: The read timeout, in seconds.
 
     Returns:
         An unsigned, thread-safe S3 client.
@@ -122,7 +123,7 @@ def make_client(jobs: int = 1) -> "S3Client":
         max_pool_connections=max(10, jobs * TRANSFER_CONCURRENCY),
         retries={"mode": "adaptive", "max_attempts": 10},
         connect_timeout=10,
-        read_timeout=60,
+        read_timeout=timeout,
     )
     return boto3.client("s3", region_name=REGION, config=config)
 

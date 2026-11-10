@@ -3,8 +3,8 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
-version: 2.2.0
-updated: 2026-11-04
+version: 2.4.0
+updated: 2026-11-10
 tags: [CLI]
 ---
 
@@ -23,7 +23,8 @@ CLIs build on [`pyclig`](https://github.com/andyrids/pyclig), which implements t
 ### Exit codes
 
 Return zero on success and non-zero on failure (pyclig): `0` ok, `1` failure, `2` usage, `70`
-internal error, `130` interrupt.
+internal error, `130` interrupt (Ctrl-C, or Ctrl-Break on Windows), `143` terminated
+(`SIGTERM`).
 
 ### Output
 
@@ -103,20 +104,39 @@ Errors are a common reason to read the documentation.
 Standard names:
 
 - `-a`, `--all` (`pyclig.options.select_all`)
-- `-d`, `--debug` (pyclig, on every command)
+- `--confirm NAME` (`pyclig.options.confirm`, with `pyclig.confirm_name`)
+- `-d`, `--debug` (pyclig, on every command; also `<PROG>_DEBUG`)
 - `-f`, `--force` (`pyclig.options.force`)
 - `-n`, `--dry-run` (`pyclig.options.dry_run`)
 - `--json` (`pyclig.options.json_output`)
 - `-h`, `--help` (pyclig)
 - `--no-input` (pyclig, on every command)
-- `-o`, `--output`
+- `-o`, `--output` (`pyclig.options.output`)
+- `-p`, `--port` (`pyclig.options.port`)
 - `--plain` (`pyclig.options.plain`)
 - `-q`, `--quiet` (pyclig, on every command)
-- `-u`, `--user`
+- `--timeout SECONDS` (`pyclig.options.timeout`)
+- `-u`, `--user` (`pyclig.options.user`)
 - `-v`, `--version` (pyclig; `-v` can also mean verbose)
 
 Run flags (`-d`, `-q`, `--no-color`, `--no-input`) work before or after the command name. A
 command's own flag with the same spelling wins (pyclig).
+
+Configuration, environment and secrets (pyclig 0.5):
+
+- Config is opt-in: `pyclig.group(..., config=pyclig.Config(project=".<name>.toml"))` adds
+  `--config FILE` and, with `profiles=True`, `--profile NAME`. Precedence is flags >
+  environment > `.env` > profile > project file > user file > system file > defaults; the files
+  are TOML and fill click's `default_map`, so top-level keys configure the root and `[sub]` a
+  subcommand
+- Directories come from `pyclig.paths` (`config_dir`, `data_dir`, `system_config_dir`): XDG
+  everywhere but Windows, never created by the library
+- `.env` is read only with `Config(dotenv=True)`, fills declared `envvar=` options the
+  environment left empty, never writes `os.environ`, and skips secret-named keys
+- A secret comes from a file or STDIN, never a flag value or an environment variable:
+  `pyclig.options.secret("token")` adds `--token-file FILE`, where `-` reads a piped STDIN and a
+  terminal STDIN is a usage error
+- `<PROG>_DEBUG=1` and `<PROG>_NO_COLOR=1` act as `-d` and `--no-color` before parsing
 
 ## (7) Interactivity
 
@@ -125,6 +145,8 @@ command's own flag with the same spelling wins (pyclig).
   default or, without one, fails naming the option)
 - Confirm large or destructive actions with `pyclig.confirm`; `--force` skips the prompt; without a
   terminal, or with `--no-input`, fail and name `--force`
+- Confirm severe actions by name with `pyclig.confirm_name`: `--confirm NAME` or the typed name;
+  `--force` never skips it; without a terminal, or with `--no-input`, fail and name `--confirm`
 - Let the user escape (pyclig: Ctrl-C at a prompt)
 
 ## (8) Subcommands
@@ -157,8 +179,10 @@ Interfaces change only after a long, documented deprecation.
 
 ## (11) Signals and control characters
 
-- Exit as soon as possible on Ctrl-C (pyclig)
-- Skip long-running cleanup on Ctrl-C and tell the user
+- Say so as soon as Ctrl-C or `SIGTERM` arrives, and exit 130 or 143 (pyclig)
+- Bound clean-up after an interrupt with `ctx.cleanup(timeout=...)`: a second Ctrl-C or the
+  timeout skips it and says so (pyclig)
+- Give network calls a timeout, configurable with `--timeout SECONDS` (`pyclig.options.timeout`)
 
 ## (12) Conformance
 

@@ -16,12 +16,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > - `Fixed` for any bug fixes.
 > - `Security` in case of vulnerabilities.
 
-## [Unreleased]
+## [0.5.0] - 2026-11-10
+
+### Added
+
+- `--timeout SECONDS` (or `DKAIS_TIMEOUT`) on `list` & `download` sets the S3 read timeout,
+  default 60; a value of 0 or less exits 2.
 
 ### Changed
 
-- Depends on `pyclig~=0.4.0`, with `pkgdx~=0.9` in development.
-- Updated to Copier template v0.5.0.
+- Depends on `pyclig~=0.6.0`, with `pkgdx~=0.11` in development.
+- Updated to Copier template v0.7.0.
+- Ctrl-C prints pyclig's `warning: interrupted` at once, with a re-run hint, instead of
+  dkais's own `Interrupted - ...` warning.
+- Clean-up after an interrupt is bounded: `cleaning up - press Ctrl-C again to skip`, and a
+  second Ctrl-C or 10 seconds exits at once.
+
+### Fixed
+
+- `SIGTERM` during `download` or `process` exits 143, not 130.
 
 ## [0.3.0] - 2026-11-03
 
