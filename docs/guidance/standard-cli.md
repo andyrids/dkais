@@ -3,8 +3,8 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
-version: 2.4.0
-updated: 2026-11-10
+version: 2.5.0
+updated: 2026-11-11
 tags: [CLI]
 ---
 
@@ -50,10 +50,14 @@ Concise help holds:
 
 - A description of what the program does
 - One or two example invocations (`examples=`)
-- Descriptions of flags, unless there are many
+- Descriptions of flags, unless there are many (pyclig: a command's own options, when it has 1
+  to 6)
 - A pointer to `--help`
 
 Give each command its own examples too (`examples=` on `@cli.command()`), shown in its `--help`.
+An example may show its output: the lines after the invocation print indented under it.
+
+Headings are bold where the terminal is styled, and plain on a pipe or with `TERM=dumb` (pyclig).
 
 ## (3) Documentation
 
@@ -61,6 +65,9 @@ Help gives a quick sense of the tool, its options and its common tasks. Document
 full detail.
 
 - Consider web-based documentation
+  - Link it from help with `docs="https://..."` on the group and on any command with its own
+    page; it prints under a closing `LEARN MORE:` section (pyclig)
+  - The root's help also lists `Issues`, from the distribution's `Project-URL` metadata (pyclig)
 - Consider terminal-based documentation
 
 ## (4) Output
@@ -90,7 +97,9 @@ Errors are a common reason to read the documentation.
 - Mind the signal-to-noise ratio
 - Put the most important information where the user looks first
 - Show debug and traceback information for unexpected errors (pyclig)
-- Make bug reports effortless (pyclig: the `Issues` project URL)
+- Make bug reports effortless (pyclig: a crash links the `Issues` project URL; on github.com &
+  gitlab.com it opens a new issue pre-filled with versions, platform & exception type)
+- MUST NOT put the error message, arguments, paths or the environment in a URL (pyclig)
 - MUST NOT parse user input as markup (pyclig)
 
 ## (6) Arguments and flags
@@ -117,12 +126,19 @@ Standard names:
 - `-q`, `--quiet` (pyclig, on every command)
 - `--timeout SECONDS` (`pyclig.options.timeout`)
 - `-u`, `--user` (`pyclig.options.user`)
-- `-v`, `--version` (pyclig; `-v` can also mean verbose)
+- `-v`, `--version` (pyclig, before or after a command name; `-v` can also mean verbose)
 
 Run flags (`-d`, `-q`, `--no-color`, `--no-input`) work before or after the command name. A
 command's own flag with the same spelling wins (pyclig).
 
-Configuration, environment and secrets (pyclig 0.5):
+Where an option's value can be switched off, accept a word such as `none`:
+`type=pyclig.options.NoneOr(int)` hands the command None for `--limit none` and shows
+`--limit INTEGER|none` in help.
+
+A file read from STDIN with `-` MUST NOT wait on a terminal: `click.File("r")` and
+`pyclig.options.secret` refuse it with a usage error (pyclig).
+
+Configuration, environment and secrets (pyclig):
 
 - Config is opt-in: `pyclig.group(..., config=pyclig.Config(project=".<name>.toml"))` adds
   `--config FILE` and, with `profiles=True`, `--profile NAME`. Precedence is flags >
@@ -174,6 +190,8 @@ Interfaces change only after a long, documented deprecation.
 
 - Keep changes additive where possible
 - Warn before a non-additive change
+  (`deprecated="use 'prog new'"` on a command or an option; in use it prints
+  `warning: command 'old' is deprecated - use 'prog new'` on STDERR - pyclig)
 - Changing output meant for humans is usually fine
 - Avoid a catch-all subcommand
 
@@ -182,6 +200,9 @@ Interfaces change only after a long, documented deprecation.
 - Say so as soon as Ctrl-C or `SIGTERM` arrives, and exit 130 or 143 (pyclig)
 - Bound clean-up after an interrupt with `ctx.cleanup(timeout=...)`: a second Ctrl-C or the
   timeout skips it and says so (pyclig)
+- Wrap blocking network I/O in `with ctx.cleanup(timeout=2):` too. A blocking call holds Ctrl-C
+  back until it returns, notably on Windows; inside the block the notice prints at once and the
+  run exits when the call returns or the timeout passes (pyclig)
 - Give network calls a timeout, configurable with `--timeout SECONDS` (`pyclig.options.timeout`)
 
 ## (12) Conformance
@@ -189,3 +210,8 @@ Interfaces change only after a long, documented deprecation.
 - Every CLI has a test calling `pyclig.testing.assert_conforms(cli)`. A finding the CLI accepts is
   silenced with `ignore={"ID": "reason"}`; the IDs are the rows of pyclig's
   [`docs/clig-coverage.md`](https://github.com/andyrids/pyclig/blob/main/docs/clig-coverage.md)
+- Pass `samples=[["list", "--json"], ...]` with command lines that are safe to run in a test. The
+  kit runs each one and reports a failing exit or invalid `--json` (BAS-4), a message on STDOUT
+  (BAS-5) and a traceback (ERR-2). Without `samples=` no command body runs
+- Raising the pyclig pin to 0.7 turns on new static rules (ARG-1, ARG-3, ARG-5, ENV-2, ENV-4,
+  SUB-4, SUB-5), so a passing test may report new findings: fix them, or `ignore=` with a reason
