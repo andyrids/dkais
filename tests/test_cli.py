@@ -878,7 +878,7 @@ def test_fast_paths_skip_heavy_imports(
 
 def test_cli_conforms_to_the_guidelines() -> None:
     """The CLI has no findings from pyclig's conformance kit."""
-    assert_conforms(cli)
+    assert_conforms(cli, ignore={"ARG-3": "-j/--jobs as in make -j"})
 
 
 def test_import_installs_only_a_null_handler() -> None:

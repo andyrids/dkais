@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > - `Fixed` for any bug fixes.
 > - `Security` in case of vulnerabilities.
 
+## [Unreleased]
+
+### Changed
+
+- Depends on `pyclig~=0.7.0`, with `pkgdx~=0.12` in development.
+- The conformance test accepts ARG-3 for `-j/--jobs` (as in `make -j`) rather than renaming it.
+
 ## [0.5.0] - 2026-11-10
 
 ### Added
