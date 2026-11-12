@@ -7,9 +7,7 @@ This Python package streamlines the download and processing of historical Automa
 Identification System (AIS) data provided by the Danish Maritime Authority (DMA).
 
 AIS is a maritime navigation safety communications system standardised by the International
-Telecommunication Union (ITU) and adopted by the International Maritime Organization (IMO). AIS is
-a VHF-based navigation and anti-collision tool making it possible to exchange information between
-ships.
+Telecommunication Union (ITU) and adopted by the International Maritime Organization (IMO).
 
 For more information about AIS, including its history, functionality and applications - see [Wikipedia](https://en.wikipedia.org/wiki/Automatic_identification_system).
 
