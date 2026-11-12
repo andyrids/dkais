@@ -14,7 +14,7 @@ ships.
 For more information about AIS, including its history, functionality and applications - see [Wikipedia](https://en.wikipedia.org/wiki/Automatic_identification_system).
 
 <!-- pyml disable MD034 -->
-https://github.com/user-attachments/assets/b809ad7f-fca4-404a-9a1e-20e29a72d7e8
+https://github.com/user-attachments/assets/3d56605d-ed94-430c-8954-cf7cfb114f95
 <!-- pyml enable MD034 -->
 
 ## Usage
