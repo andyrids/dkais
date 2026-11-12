@@ -3,7 +3,7 @@ context-hierarchy: Layer 3
 context-hierarchy-role: Reference material
 immutable: true
 recommended-context-tokens: 2500
-version: 2.5.0
+version: 2.6.0
 updated: 2026-11-11
 tags: [CLI]
 ---
@@ -113,7 +113,7 @@ Errors are a common reason to read the documentation.
 Standard names:
 
 - `-a`, `--all` (`pyclig.options.select_all`)
-- `--confirm NAME` (`pyclig.options.confirm`, with `pyclig.confirm_name`)
+- `--confirm NAME` (`pyclig.options.confirm_name`, with `pyclig.confirm_name`)
 - `-d`, `--debug` (pyclig, on every command; also `<PROG>_DEBUG`)
 - `-f`, `--force` (`pyclig.options.force`)
 - `-n`, `--dry-run` (`pyclig.options.dry_run`)
@@ -213,5 +213,5 @@ Interfaces change only after a long, documented deprecation.
 - Pass `samples=[["list", "--json"], ...]` with command lines that are safe to run in a test. The
   kit runs each one and reports a failing exit or invalid `--json` (BAS-4), a message on STDOUT
   (BAS-5) and a traceback (ERR-2). Without `samples=` no command body runs
-- Raising the pyclig pin to 0.7 turns on new static rules (ARG-1, ARG-3, ARG-5, ENV-2, ENV-4,
-  SUB-4, SUB-5), so a passing test may report new findings: fix them, or `ignore=` with a reason
+- From pyclig 1.0 the kit's rule IDs are frozen: none is removed, renamed or split in 1.x, and a
+  rule added later is opt-in, so a passing `assert_conforms(cli)` keeps passing on `pyclig~=1.0`
