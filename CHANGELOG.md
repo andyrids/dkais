@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > - `Fixed` for any bug fixes.
 > - `Security` in case of vulnerabilities.
 
+## [0.7.0] - 2026-11-12
+
+### Changed
+
+- Depends on `pyclig~=1.0`, with `pkgdx~=0.13` in development.
+
 ## [0.6.0] - 2026-11-11
 
 ### Changed
