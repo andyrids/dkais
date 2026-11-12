@@ -48,20 +48,67 @@ test-processed:
 [doc("Demo `dkais` CLI")]
 [group("DEMO")]
 demo:
-    uv run dkais -h
-    @echo "" && sleep 2
-    uv run dkais list --start 2026-10-01 --end 2026-10-02
-    @echo "" && sleep 2 && clear
-    uv run dkais list --data-dir 'C:/Users/andre/Data/AISDK' --start 2026-10-01 --end 2026-10-02
-    @echo "" && sleep 2 && clear
-    uv run dkais download --data-dir 'C:/Users/andre/Data/AISDK' --start 2026-10-01 --end 2026-10-01
-    @echo "" && sleep 2 && clear
-    uv run dkais download --data-dir 'C:/Users/andre/Data/AISDK' --start 2026-10-01 --end 2026-10-01
-    @echo "" && sleep 2 && clear
-    uv run dkais list --data-dir 'C:/Users/andre/Data/AISDK' --start 2026-10-01 --end 2026-10-05
-    @echo "" && sleep 2 && clear
-    uv run dkais process --data-dir 'C:/Users/andre/Data/AISDK' --start 2026-10-01 --end 2026-10-05
-    @echo "" && sleep 2 && clear
-    uv run dkais list --data-dir 'C:/Users/andre/Data/AISDK' --start 2026-10-01 --end 2026-10-05
-    @echo "" && sleep 2 && clear
-    uv run scripts/read_parquet.py
+    @echo '{{CLEAR}}'
+    @echo '{{ BOLD + CYAN + INVERT + "--- dkais demo ---\n" + NORMAL }}'
+    @sleep 1
+
+    @echo '{{ BOLD + CYAN + "LIST - query remote AIS data\n" + NORMAL }}'
+    @echo '{{ GREEN + ITALIC + "$ dkais list --data-dir D:/Data/AISDK --start 2026-10-01 --end 2026-10-02" + NORMAL }}'
+    @sleep 1
+    @uv run dkais list --data-dir 'D:\Data\AISDK' --start 2026-10-01 --end 2026-10-02
+    @sleep 2
+
+    @echo ""
+    @echo '{{ BOLD + CYAN + "LIST - can use $DKAIS_DATA_DIR for local data dir\n" + NORMAL }}'
+    @echo '{{ GREEN + ITALIC + '$ DKAIS_DATA_DIR=D:/Data/AISDK' + NORMAL }}'
+    @echo '{{ GREEN + ITALIC + "$ dkais list --start 2026-10-01 --end 2026-10-02" + NORMAL }}'
+    @sleep 1
+    @uv run dkais list --start 2026-10-01 --end 2026-10-02
+    @sleep 2
+
+    @echo ""
+    @echo '{{ BOLD + CYAN + "DOWNLOAD - download remote AIS data\n" + NORMAL }}'
+    @echo '{{ GREEN + ITALIC + "$ dkais download --start 2026-10-01 --end 2026-10-02" + NORMAL }}'
+    @sleep 1
+    @uv run dkais download --start 2026-10-01 --end 2026-10-02
+    @sleep 2
+
+    @echo ""
+    @echo '{{ BOLD + CYAN + "DOWNLOAD - is idempotent (without --force)\n" + NORMAL }}'
+    @echo '{{ GREEN + ITALIC + "$ dkais download --start 2026-10-01 --end 2026-10-02" + NORMAL }}'
+    @sleep 1
+    @uv run dkais download --start 2026-10-01 --end 2026-10-02
+    @sleep 2
+
+    @echo ""
+    @echo '{{ BOLD + CYAN + "PROCESS - process downloaded CSV into Parquet\n" + NORMAL }}'
+    @echo '{{ GREEN + ITALIC + "$ dkais process --all --dry-run" + NORMAL }}'
+    @sleep 1
+    @uv run dkais process --all --dry-run
+    @sleep 2
+
+    @echo ""
+    @echo '{{ GREEN + ITALIC + "$ dkais process --start 2026-10-01 --end 2026-10-02" + NORMAL }}'
+    @sleep 1
+    @uv run dkais process --start 2026-10-01 --end 2026-10-02
+    @sleep 2
+
+    @echo ""
+    @echo '{{ BOLD + CYAN + "PROCESS - is idempotent (without --force)\n" + NORMAL }}'
+    @echo '{{ GREEN + ITALIC + "$ dkais process --start 2026-10-01 --end 2026-10-02" + NORMAL }}'
+    @sleep 1
+    @uv run dkais process --start 2026-10-01 --end 2026-10-02
+    @sleep 2
+
+    @echo ""
+    @echo '{{ BOLD + CYAN + "LIST - highlights Raw & Processed data in --data-dir \\ $DKAIS_DATA_DIR\n" + NORMAL }}'
+    @echo '{{ GREEN + ITALIC + "$ dkais list --start 2026-10-01 --end 2026-10-02" + NORMAL }}'
+    @sleep 1
+    @uv run dkais list --start 2026-10-01 --end 2026-10-02
+    @sleep 2
+
+    @echo ""
+    @uv run scripts/read_parquet.py
+
+    @echo ""
+    @echo '{{ BOLD + CYAN + INVERT + "--- Test dkais in Colab - docs/example/DKAIS_EXAMPLE.ipynb ---\n" + NORMAL }}'
